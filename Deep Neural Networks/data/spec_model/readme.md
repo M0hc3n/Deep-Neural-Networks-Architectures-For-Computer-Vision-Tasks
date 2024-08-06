@@ -1,0 +1,1 @@
+Define for required model training data store
