@@ -1,61 +1,103 @@
-from modeling.model import ClassificationModel
-import os
-import tensorflow as tf
-import logging
-from core.loggging import logger
-import argparse
-import datetime
+import numpy as np
+import matplotlib.pyplot as plt
+
+from modeling.metrics import accuracy
+
+from core.config import report_dir
+class ModelTrainer:
+    training_data_loader = None
+    model, criterion, optimizer = None, None, None
+    losses, accuracies = [], []
+
+    def __init__(self, training_data_loader, model, criterion, optimizer):
+        self.training_data_loader = training_data_loader
+
+        self.model = model
+        self.criterion = criterion
+        self.optimizer = optimizer
 
 
-def process(data_dir: str,
-            batch_size: int,
-            learning_rate: int,
-            img_height: str,
-            img_width: str,
-            epochs: str,
-            checkpoint_path: str,
-            log_dir: str = "logs/fit/"):
+    def trainer_each_batch(self, x, y):
+        self.model.train()
+        # call model on the batch of inputs
+        # `model.train()` tells your model that you are training the model. 
+        # So BatchNorm layers use per-batch statistics and Dropout layers are activated etc
+        # Forward pass: Compute predicted y by passing x to the model
+        prediction = self.model(x) 
+        # "prediction = model(x)" executes forward propagation over x 
+        
+        # compute loss
+        loss_for_this_batch = self.criterion(prediction, y)
+        
+        # based on the forward pass in `model(x)` compute all the gradients of model.parameters()
+        # loss.backward() computes dloss/dx for every parameter x which has requires_grad=True.
+        # These are accumulated into x.grad for every parameter x.
+        # In pseudo-code:
+        # x.grad += dloss/dx
+        loss_for_this_batch.backward()
+        
+        """ apply new-weights = f(old-weights, old-weight-gradients) where "f" is the optimizer 
+        When you call `loss.backward()`, all it does is compute gradient of loss w.r.t all the parameters in loss that have `requires_grad = True` and store them in `parameter.grad` attribute for every parameter.
 
-    logger.info('TRAINING ---> Starting training ...')
-    classification = ClassificationModel()
+        `optimizer.step()` updates all the parameters based on `parameter.grad`
+        """
+        
+        self.optimizer.step()
+        
+        # Flush gradients memory for next batch of calculations
+        # `optimizer.zero_grad()` clears `x.grad` for every parameter x in the optimizer.
+        # Not zeroing grads would lead to gradient accumulation across batches.
+        self.optimizer.zero_grad()
+        
+        return loss_for_this_batch.item()
 
-    train_ds = classification.load_train_ds(
-        data_dir, 0.2, "training", 123, (img_height, img_width), batch_size)
-    logger.info('TRAINING ---> Loaded training dataset')
+    def train_model(self):
+        for epoch in range(5):
+            print(epoch)
+            
+            # Creating lists that will contain the accuracy and loss values corresponding to each batch within an epoch:
+            losses_in_this_epoch, accuracies_in_this_epoch = [], []
+            
+            # Create batches of training data by iterating through the DataLoader:
+            for ix, batch in enumerate(iter(self.training_data_loader)):
+                x, y = batch
+                """ Train the batch using the trainer_each_batch() function and store the loss value at
+                the end of training on top of the batch as loss_for_this_batch. 
+                Furthermore, store the loss values across batches in the losses_in_this_epoch list:
+                """
+                loss_for_this_batch = self.trainer_each_batch(x, y)
+                losses_in_this_epoch.append(loss_for_this_batch)
+            
+            # After the above loop is done 
+            # store the mean loss value across all batches within an epoch:    
+            epoch_loss = np.array(losses_in_this_epoch).mean()
+            
+            # Next, we calculate the accuracy of the prediction at the end of training on all batches:
+            for ix, batch in enumerate(iter(self.training_data_loader)):
+                x, y = batch
+                is_correct = accuracy(x, y, self.model)
+                accuracies_in_this_epoch.extend(is_correct)
+            epoch_accuracy = np.mean(accuracies_in_this_epoch)
+            
+            self.losses.append(epoch_loss)
+            
+            self.accuracies.append(epoch_accuracy)
+    
+    def plot_trainning_report(self):
+        epochs = np.arange(5)+1
 
-    val_ds = classification.load_val_ds(
-        data_dir, 0.2, "validation", 123, (img_height, img_width), batch_size)
-    logger.info('TRAINING ---> Loaded validation dataset')
+        print(self.losses)
+        print(self.accuracies)
+        plt.figure(figsize=(20,5))
+        plt.subplot(121)
+        plt.title('Loss value over increasing epochs')
+        plt.plot(epochs, self.losses, label='Training Loss')
+        plt.legend()
+        plt.subplot(122)
+        plt.title('Accuracy value over increasing epochs')
+        plt.plot(epochs, self.accuracies, label='Training Accuracy')
+        plt.gca().set_yticklabels(['{:.0f}%'.format(x*100) for x in plt.gca().get_yticks()]) 
+        plt.legend()
 
-    model = classification.create_model(
-        (img_height, img_width, 3), learning_rate)
+        plt.savefig(f"{report_dir}/classification_report.png")
 
-    log_dir = os.path.join(
-        log_dir, datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
-
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=log_dir, histogram_freq=1)
-
-    # Create a callback that saves the model's weights
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                     save_weights_only=True,
-                                                     verbose=1)
-
-    logger.info('TRAINING ---> Starting training model')
-
-    history = model.fit(
-        train_ds,
-        validation_data=val_ds,
-        epochs=epochs,
-        callbacks=[cp_callback, tensorboard_callback]
-    )
-
-    logger.info('TRAINING ---> Successfully training model ...')
-
-    logger.info(
-        'PACKING ---> Starting load trained model from: {}'.format(checkpoint_path))
-
-    model = classification.load_model_from_checkpoint(
-        checkpoint_path, (img_height, img_width, 3), learning_rate)
-
-    logger.info('PACKING ---> Load trained model success!')
