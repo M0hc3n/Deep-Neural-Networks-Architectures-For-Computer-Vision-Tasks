@@ -13,7 +13,7 @@ def accuracy(x, y, model):
     model.eval()
     
     # get the prediction matrix for a tensor of `x` images
-    prediction = model(x)
+    prediction = model(x)[0]
     
     # Now compute if the location of maximum in each row coincides with ground truth
     # For that firs I am identifying the argmax index corresponding to each row with prediction.max(-1)
@@ -25,3 +25,8 @@ def accuracy(x, y, model):
     is_correct = argmaxes == y
     
     return is_correct.cpu().numpy().tolist()
+
+def test_loss(x, y, model, criterion):
+    prediction = model(x)[0]
+    test_loss = criterion(prediction, y)
+    return test_loss.item()

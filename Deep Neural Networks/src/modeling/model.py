@@ -7,15 +7,20 @@ class Model(nn.Module):
     def __init__(self):
         super(Model, self).__init__()
 
-        self.model = nn.Sequential(
-            nn.Linear(28 * 28, 1000), nn.ReLU(), nn.Linear(1000, 10)
-        ).to(device)
+        self.input_to_hidden_layer = nn.Linear(784, 1000)
+        self.batch_norm = nn.BatchNorm1d(1000)
+        self.hidden_layer_activation = nn.ReLU()
+        self.hidden_to_output_layer = nn.Linear(1000, 10)
 
     def forward(self, x):
-        return self.model(x)
+        x = self.input_to_hidden_layer(x)
+        fc0 = self.batch_norm(x)
+        fc1 = self.hidden_layer_activation(fc0)
+        fc2 = self.hidden_to_output_layer(fc1)
+        return fc2, fc1
 
     def create_model(self, learning_rate: float = 0.001):
-        model = Model()
+        model = Model().to(device)
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=learning_rate)
         return model, criterion, optimizer

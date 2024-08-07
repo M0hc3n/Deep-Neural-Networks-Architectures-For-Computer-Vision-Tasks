@@ -4,9 +4,13 @@ import torchvision
 class ExtractDataset:
     input_dir = ""
     train_data = None
+    test_data = None
 
-    classes = None
-    targets = None
+    train_classes = None
+    train_targets = None
+
+    test_classes = None
+    test_targets = None
 
     def __init__(self, input_dir=""):
         self.input_dir = input_dir
@@ -16,8 +20,18 @@ class ExtractDataset:
         )
 
         self.train_data = data_base.data
-        self.targets = data_base.targets
-        self.classes = data_base.classes
+        self.train_targets = data_base.targets
+        self.train_classes = data_base.classes
 
-        logger.info('collected: {}'.format(self.train_data.size()))
+        test_base = torchvision.datasets.FashionMNIST(
+            f"{self.input_dir}/test", download=True, train=False
+        )
+
+        self.test_data = test_base.data
+        self.test_targets = test_base.targets
+        self.test_classes = test_base.classes
+
+        logger.info('Train collected: {}'.format(self.train_data.size()))
+        logger.info('Test collected: {}'.format(self.test_data.size()))
+
 
