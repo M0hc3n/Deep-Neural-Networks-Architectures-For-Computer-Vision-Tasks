@@ -6,6 +6,7 @@ import numpy as np
 
 from torch.utils.data import Dataset
 
+import matplotlib.pyplot as plt
 
 class DatasetTransformer(Dataset):
     cropping_box = None
@@ -35,3 +36,17 @@ class DatasetTransformer(Dataset):
             ) / (255 - self.training_images[i].min())
 
         self.training_images = np.array(self.training_images)
+
+    def plotter(self):
+        plt.figure(figsize=(10, 10))
+        fig, ax = plt.subplots(2, 5)
+        fig.suptitle("Real Images")
+        idx = 8
+
+        for i in range(2):
+            for j in range(5):
+                ax[i, j].imshow(self.training_images[idx].reshape(64, 64, 3))
+                idx += 6
+            
+        plt.tight_layout()
+        plt.show()
