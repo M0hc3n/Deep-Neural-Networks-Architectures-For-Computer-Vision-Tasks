@@ -8,6 +8,8 @@ from torch.utils.data import Dataset
 
 import matplotlib.pyplot as plt
 
+import torch
+
 class DatasetTransformer(Dataset):
     cropping_box = None
     default_size = (64, 64)
@@ -50,3 +52,13 @@ class DatasetTransformer(Dataset):
             
         plt.tight_layout()
         plt.show()
+
+    def __len__(self):
+        return len(self.training_images)
+
+    def __getitem__(self, idx):
+        image = self.training_images[idx]
+        # Convert the image to a tensor
+        image = torch.tensor(image, dtype=torch.float32).permute(2, 0, 1)  # Convert HWC to CHW
+        
+        return image, 0

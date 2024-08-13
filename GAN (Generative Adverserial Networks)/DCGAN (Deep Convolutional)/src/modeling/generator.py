@@ -4,7 +4,6 @@ import torch.optim as optim
 
 from core.config import device
 
-
 class Generator(nn.Module):
     noise_shape = None
 
@@ -44,8 +43,8 @@ class Generator(nn.Module):
 
     def create_model(self, learning_rate: float = 0.001):
         model = Generator().to(device)
-        criterion = nn.CrossEntropyLoss()
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        criterion = nn.BCELoss()
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, betas=(0.5, 0.999))
         return model, criterion, optimizer
 
     def load_model_from_checkpoint(
