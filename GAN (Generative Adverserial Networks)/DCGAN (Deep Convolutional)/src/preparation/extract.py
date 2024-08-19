@@ -2,7 +2,7 @@ import os
 
 from core.loggging import logger
 
-class ExtractDataset:
+class DatasetExtractor:
     input_dir = ""
 
     all_images = []
