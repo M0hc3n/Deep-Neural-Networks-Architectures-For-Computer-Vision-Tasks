@@ -1,10 +1,7 @@
 from modeling.generator import Generator
 from modeling.discriminator import Discriminator
 
-from core.config import device
-
 import torch.nn as nn
-from torch import optim
 
 class GAN(nn.Module):
     def __init__(self, random_shape, data_shape, num_classes):
@@ -17,14 +14,11 @@ class GAN(nn.Module):
         gen_input_dim = self.get_gen_input_dim(random_shape, num_classes)
         disc_input_dim = self.get_disc_input_dim(data_shape, num_classes)
 
-        self.gen = Generator(noise_shape=gen_input_dim).to(device)
-        self.disc = Discriminator(noise_shape=disc_input_dim).to(device)
+        self.gen, _, self.gen_opt = Generator().create_model(gen_input_dim, learning_rate=0.0001)
+        self.disc, _, self.disc_opt = Discriminator().create_model(disc_input_dim, learning_rate=0.0001)
         
-        self.gen = self.gen.apply(self.init_weights)
-        self.disc = self.disc.apply(self.init_weights)
-        
-        self.gen_opt = optim.Adam(self.gen.parameters(), lr=0.0001)
-        self.disc_opt = optim.Adam(self.disc.parameters(), lr=0.0001)
+        # self.gen = self.gen.init_weights()
+        # self.disc = self.disc.init_weights()
         
         self.criterion = nn.BCEWithLogitsLoss() 
 
@@ -35,7 +29,7 @@ class GAN(nn.Module):
         # "+" here means concatenating tensors afterwards
 
     def get_disc_input_dim(self, data_shape, num_classes):
-        return data_shape + num_classes  # same logic goes here
+        return data_shape[0] + num_classes  # same logic goes here
     
     def init_weights(m):
         if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):

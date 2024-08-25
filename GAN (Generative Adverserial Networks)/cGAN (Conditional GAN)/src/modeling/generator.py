@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.optim as optim
 
@@ -6,8 +5,9 @@ from core.config import device
 
 
 class Generator(nn.Module):
-    def __init__(self, noise_shape=100, image_channel=1, hidden_dim=64):
+    def __init__(self, noise_shape=10, image_channel=1, hidden_dim=64):
         super(Generator, self).__init__()
+        self.noise_shape = noise_shape
 
         # notice how we decrease the dimension to match the output one
         self.model = nn.Sequential(
@@ -55,18 +55,16 @@ class Generator(nn.Module):
                 nn.Tanh(),
             )
 
-    def forward(self, image):
-        pred = self.model(image)
-        
-        return pred.view(len(pred), -1)
-    
-    
+    def forward(self, noise):
+        x = noise.view(len(noise), self.noise_shape, 1, 1)
 
-    # def create_model(self, learning_rate: float = 0.001):
-    #     model = Generator().to(device)
-    #     criterion = nn.BCELoss()
-    #     optimizer = optim.Adam(model.parameters(), lr=learning_rate, betas=(0.5, 0.999))
-    #     return model, criterion, optimizer
+        return self.model(x)
+
+    def create_model(self, gen_input_dim, learning_rate: float = 0.001):
+        model = Generator(noise_shape=gen_input_dim).to(device)
+        criterion = nn.BCELoss()
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        return model, criterion, optimizer
 
     # def load_model_from_checkpoint(
     #     self, checkpoint_path: str, input_shape: tuple, learning_rate: float = 0.001

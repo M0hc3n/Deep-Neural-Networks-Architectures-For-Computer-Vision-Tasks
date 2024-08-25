@@ -14,7 +14,7 @@ class GetDataset:
         )
 
         data_base = datasets.FashionMNIST(
-            f"{input_dir}/train", download=False, transform=transform
+            f"{input_dir}/train", download=True, transform=transform
         )
 
         self.data_loader = DataLoader(data_base, batch_size=batch_size, shuffle=True)
