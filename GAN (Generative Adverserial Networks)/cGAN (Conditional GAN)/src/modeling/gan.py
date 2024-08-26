@@ -4,14 +4,14 @@ from modeling.discriminator import Discriminator
 import torch.nn as nn
 
 class GAN(nn.Module):
-    def __init__(self, random_shape, data_shape, num_classes):
+    def __init__(self, noise_shape, data_shape, num_classes):
         super(GAN, self).__init__()
 
-        self.random_shape = random_shape
+        self.noise_shape = noise_shape
         self.data_shape = data_shape
         self.num_classes = num_classes
 
-        gen_input_dim = self.get_gen_input_dim(random_shape, num_classes)
+        gen_input_dim = self.get_gen_input_dim(noise_shape, num_classes)
         disc_input_dim = self.get_disc_input_dim(data_shape, num_classes)
 
         self.gen, _, self.gen_opt = Generator().create_model(gen_input_dim, learning_rate=0.0001)
@@ -22,9 +22,9 @@ class GAN(nn.Module):
         
         self.criterion = nn.BCEWithLogitsLoss() 
 
-    def get_gen_input_dim(self, random_shape, num_classes):
+    def get_gen_input_dim(self, noise_shape, num_classes):
         return (
-            random_shape + num_classes
+            noise_shape + num_classes
         )  # cuz y is passed to generator in one hot encoding format
         # "+" here means concatenating tensors afterwards
 

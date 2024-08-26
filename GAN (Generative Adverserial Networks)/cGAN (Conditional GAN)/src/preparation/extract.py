@@ -18,5 +18,11 @@ class GetDataset:
         )
 
         self.data_loader = DataLoader(data_base, batch_size=batch_size, shuffle=True)
-        
+
+        self.num_classes = len(data_base.classes)
+
+        for images, _ in self.data_loader:
+            self.shape = images.shape[1:]
+            break
+
         logger.info("Train collected: {}".format(len(self.data_loader)))
