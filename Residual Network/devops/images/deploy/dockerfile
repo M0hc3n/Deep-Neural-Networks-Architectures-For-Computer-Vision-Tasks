@@ -1,0 +1,10 @@
+# FROM tensorflow/tensorflow:latest ---> CPU unly
+FROM tensorflow/tensorflow:latest-gpu
+
+RUN apt-get -y update
+
+WORKDIR /app
+
+COPY src /app
+
+# Implementation for flask API hosting model
