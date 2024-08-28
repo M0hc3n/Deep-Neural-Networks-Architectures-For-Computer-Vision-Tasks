@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch import optim
 
 import torch.nn.functional as F
 
@@ -14,13 +15,13 @@ class ResNet(nn.Module):
         self.bn0 = nn.BatchNorm2d(16)
 
         self.block1 = self.__build_layer(
-            block_type, 16, num_blocks=[0], starting_stride=1
+            block_type, 16, num_blocks=num_blocks[0], starting_stride=1
         )
         self.block2 = self.__build_layer(
-            block_type, 32, num_blocks=[1], starting_stride=2
+            block_type, 32, num_blocks=num_blocks[1], starting_stride=2
         )
         self.block3 = self.__build_layer(
-            block_type, 64, num_blocks=[2], starting_stride=2
+            block_type, 64, num_blocks=num_blocks[2], starting_stride=2
         )
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
@@ -49,3 +50,9 @@ class ResNet(nn.Module):
 
         out = self.linear(out)
         return out
+
+    def get_criterion(self):
+        return nn.CrossEntropyLoss()
+
+    def get_optimizer(self, learning_rate=0.01):
+        return optim.Adam(self.parameters(), lr=learning_rate)

@@ -2,7 +2,7 @@ from torch import nn
 
 # a custom Layer that implements whatever lambda function passed to it
 # instead of default operations (from torch)
-class LambdaLayer(nn.module):
+class LambdaLayer(nn.Module):
     def __init__(self, lambda_func):
         super(LambdaLayer, self).__init__()
 

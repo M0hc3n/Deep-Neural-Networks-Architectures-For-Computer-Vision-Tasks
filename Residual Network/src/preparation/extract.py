@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, random_split
 class GetDataset:
     input_dir = ""
 
-    def __init__(self, input_dir, batch_size):
+    def __init__(self, input_dir, batch_size=32):
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
         )

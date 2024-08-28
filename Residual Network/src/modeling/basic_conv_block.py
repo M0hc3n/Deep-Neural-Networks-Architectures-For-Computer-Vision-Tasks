@@ -2,7 +2,7 @@ from torch import nn
 
 from collections import OrderedDict
 
-from modeling.utils import LambdaLayer
+from modeling.lambda_layer import LambdaLayer
 
 import torch.nn.functional as F
 
@@ -11,7 +11,7 @@ import torch.nn.functional as F
 # it basically implements the convolutional block depending on the given option
 #       - Option A: increase channel by using identity shortcuts (with null padding)
 #       - Option B: increase channel using 1*1 convolution (projection shortcut)
-class BasicConvBlock(nn.module):
+class BasicConvBlock(nn.Module):
     def __init__(self, input_channels, output_channels, stride=1, option="A"):
         super(BasicConvBlock, self).__init__()
 
@@ -29,11 +29,11 @@ class BasicConvBlock(nn.module):
                 ],
             )
         )
-
+        
         self.shortcut = nn.Sequential()
 
         # only apply shortcut if there is a channel mismatch or stride is larger than 1
-        if stride != 1 or input_channels != output_channels:
+        if stride != 1 or input_channels != output_channels:            
             self._option_mapper(
                 option=option,
                 input_channels=input_channels,
@@ -58,7 +58,7 @@ class BasicConvBlock(nn.module):
                 kernel_size=kernel_size,
                 padding=padding,
                 bias=bias,
-            ),
+            )
         )
 
     def _option_mapper(self, option, input_channels, output_channels, stride):
@@ -78,7 +78,7 @@ class BasicConvBlock(nn.module):
         pass
 
     def _projection_shortcut(self, in_c, out_c, stride):
-        self.shortcut(
+        self.shortcut = nn.Sequential(
             OrderedDict(
                 [
                     (
