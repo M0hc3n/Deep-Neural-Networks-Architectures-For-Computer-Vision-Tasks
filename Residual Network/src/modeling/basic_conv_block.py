@@ -29,11 +29,11 @@ class BasicConvBlock(nn.Module):
                 ],
             )
         )
-        
+
         self.shortcut = nn.Sequential()
 
         # only apply shortcut if there is a channel mismatch or stride is larger than 1
-        if stride != 1 or input_channels != output_channels:            
+        if stride != 1 or input_channels != output_channels:
             self._option_mapper(
                 option=option,
                 input_channels=input_channels,
@@ -50,15 +50,13 @@ class BasicConvBlock(nn.Module):
         padding=1,
         bias=False,
     ):
-        return (
-            nn.Conv2d(
-                in_channels=input_channels,
-                out_channels=output_channels,
-                stride=stride,
-                kernel_size=kernel_size,
-                padding=padding,
-                bias=bias,
-            )
+        return nn.Conv2d(
+            in_channels=input_channels,
+            out_channels=output_channels,
+            stride=stride,
+            kernel_size=kernel_size,
+            padding=padding,
+            bias=bias,
         )
 
     def _option_mapper(self, option, input_channels, output_channels, stride):
@@ -66,7 +64,10 @@ class BasicConvBlock(nn.Module):
             return self._identity_shortcut(out_c=output_channels)
         else:  # assumption is "B"
             return self._projection_shortcut(input_channels, output_channels, stride)
-
+        
+        
+    # in identity shortcut, we padd the channels (to increase them)
+    # this is shown to be the less performant solution
     def _identity_shortcut(self, out_c):
         padd_to_add = out_c // 4
 
@@ -77,6 +78,10 @@ class BasicConvBlock(nn.Module):
         )
         pass
 
+    # What does a 1*1 convolution mean ?
+    # in NNs, we use 1*1 as kernel size whenever we want to keep the same height, 
+    # and width and increase (or decrease) the number of channels
+    # more info here: https://stats.stackexchange.com/questions/194142/what-does-1x1-convolution-mean-in-a-neural-network
     def _projection_shortcut(self, in_c, out_c, stride):
         self.shortcut = nn.Sequential(
             OrderedDict(
