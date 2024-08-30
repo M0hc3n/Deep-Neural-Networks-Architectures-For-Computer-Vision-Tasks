@@ -1,17 +1,6 @@
-**This project is starting to build standard starter kit for Data Scientist, AI Engineering, Developer who working on Machine Learnng field.**
+## GoogleLeNet (Inception V1):
 
-**Design Concepts:**
--
-- Quickly start, easy to learning and apply
-- Basic, standard and professional
-- Should be implement specific model in individual repository to reduce complexity of the project
-
-**Features**
-- 
-- Repository structure for ML projects
-- Samples to apply Azure Machine Learning, AWS SageMaker as standard workspace
-- Definition for MLOps
-
-**Contributers**
-- 
-- @ai.nhattv
+This code had been using the following: 
+- [Original Research Paper](https://arxiv.org/pdf/1409.4842)
+- [Original Implementation](https://www.youtube.com/watch?v=CZNYrkdDrmQ&list=PLxqBkZuBynVRyOJs4RWmB_fKlOVe5S8CR&index=11)
+- [Good Article of the Difference between Inception Architectures](https://towardsdatascience.com/a-simple-guide-to-the-versions-of-the-inception-network-7fc52b863202)
