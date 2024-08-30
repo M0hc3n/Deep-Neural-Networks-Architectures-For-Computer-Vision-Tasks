@@ -15,7 +15,7 @@ I'll be working more on this repository in the upcoming time, as I have some arc
 - [x] Residual Networks
 - [ ] GoogleLeNet (Inception)
   - [x] Inception v1
-  - [x] Inception v2
+  - [ ] Inception v2
   - [ ] Inception v3
   - [ ] Inception v4
   - [ ] Inception-ReNet
