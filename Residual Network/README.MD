@@ -6,6 +6,7 @@ This code had been using the following:
 - [Resnet Completely Fully Explained](https://www.youtube.com/watch?v=Q1JCrG1bJ-A)
 - [Original Implementation](https://www.youtube.com/watch?v=P8U1VL93jzA&list=PLxqBkZuBynVRyOJs4RWmB_fKlOVe5S8CR&index=10)
 - [Useful Article](https://medium.com/@ibtedaazeem/understanding-resnet-architecture-a-deep-dive-into-residual-neural-network-2c792e6537a9)
+- [Kaggle Notebook](https://www.kaggle.com/code/mohcenchouireb/resnet-using-pytorch)
 
 #### Additional Comments:
 - there is a dimension issue with Projection Mapping.
