@@ -1,75 +1,73 @@
 import torch.nn as nn
-import torch.optim as optim
 
-from core.config import device
-
+from modeling.residual_block import ResidualBlock
 
 class Generator(nn.Module):
-    def __init__(self, noise_shape=10, image_channel=1, hidden_dim=64):
+    def __init__(self, input_shape, res_blocks_num):
         super(Generator, self).__init__()
-        self.noise_shape = noise_shape
 
-        # notice how we decrease the dimension to match the output one
-        self.model = nn.Sequential(
-            self.get_generator_block(
-                input_channels=noise_shape, output_channels=hidden_dim * 4
-            ),
-            self.get_generator_block(
-                input_channels=hidden_dim * 4,
-                output_channels=hidden_dim * 2,
-                kernel_size=4,
-                stride=1,
-            ),
-            self.get_generator_block(
-                input_channels=hidden_dim * 2, output_channels=hidden_dim
-            ),
-            self.get_generator_block(
-                input_channels=hidden_dim,
-                output_channels=image_channel,
-                kernel_size=4,
-                final_layer=True,
-            ),
-        )
+        channels = input_shape[0]
+        out_channels = 64
 
-    def get_generator_block(
-        self,
-        input_channels,
-        output_channels,
-        kernel_size=3,
-        stride=2,
-        final_layer=False,
-    ):
-        if not final_layer:
-            return nn.Sequential(
-                nn.ConvTranspose2d(
-                    input_channels, output_channels, kernel_size, stride
-                ),
-                nn.BatchNorm2d(output_channels),
-                nn.ReLU(inplace=True),
-            )
-        else:
-            return nn.Sequential(
-                nn.ConvTranspose2d(
-                    input_channels, output_channels, kernel_size, stride
-                ),
-                nn.Tanh(),
-            )
+        # c7s1
+        model = self._get_input_output_conv(channels, out_channels)
 
-    def forward(self, noise):
-        x = noise.view(len(noise), self.noise_shape, 1, 1)
+        in_channels = out_channels
 
+        # downsampling: d128, d256
+        for _ in range(2):
+            out_channels *= 2  # 128 then 256
+
+            model += self._get_ud_conv(in_channels, out_channels)
+
+            in_channels = out_channels
+
+        # resnet blocks
+        for _ in range(res_blocks_num):
+            model += [ResidualBlock(in_channels)]  # fixed channels (256)
+
+        # upsampling: u128, u64
+        for _ in range(2):
+            out_channels //= 2 # 128 then 64
+
+            model += self._get_ud_conv(in_channels, out_channels, is_u=True)
+
+            in_channels = out_channels
+
+        # Output Layer:
+        model += self._get_input_output_conv(channels, out_channels, is_output=True)
+
+        self.model = nn.Sequential(*model)
+
+    def forward(self, x):
         return self.model(x)
 
-    def create_model(self, gen_input_dim, learning_rate: float = 0.001):
-        model = Generator(noise_shape=gen_input_dim).to(device)
-        criterion = nn.BCELoss()
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-        return model, criterion, optimizer
+    def _get_ud_conv(self, in_channels, out_channels, is_u=False):
+        res = []
 
-    # def load_model_from_checkpoint(
-    #     self, checkpoint_path: str, input_shape: tuple, learning_rate: float = 0.001
-    # ):
-    #     model, criterion, optimizer = self.create_model(input_shape, learning_rate)
-    #     model.load_state_dict(torch.load(checkpoint_path))
-    #     model.eval()
-    #     return model
+        if is_u:
+            res = [
+                nn.Upsample(scale_factor=2),
+            ]
+
+        return res + [
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1),
+            nn.InstanceNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        ]
+
+    def _get_input_output_conv(self, in_channels, out_channels, is_output=False):
+        res = [
+            nn.ReflectionPad2d(in_channels),
+            nn.Conv2d(in_channels, out_channels, 7),
+        ]
+
+        if is_output:
+            return res + [
+                nn.Tanh(),
+            ]
+        else:
+            return res + [
+                nn.InstanceNorm2d(out_channels),
+                nn.ReLU(inplace=True),
+            ]

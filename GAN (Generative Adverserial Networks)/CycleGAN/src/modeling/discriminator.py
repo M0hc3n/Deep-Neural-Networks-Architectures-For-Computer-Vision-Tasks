@@ -1,66 +1,43 @@
 import torch.nn as nn
-import torch.optim as optim
-
-from core.config import device
 
 
 class Discriminator(nn.Module):
-    def __init__(self, image_channel=1, hidden_dim=64):
+    def __init__(self, input_shape):
         super(Discriminator, self).__init__()
 
-        self.image_channel = image_channel
-        self.hidden_dim = hidden_dim
+        channels, height, width = input_shape
+        self.output_shape = (1, height // 2**4, width // 2**4)
 
-        # notice how we decrease the dimension to match the output one
         self.model = nn.Sequential(
-            self.get_discriminator_block(
-                input_channels=image_channel, output_channels=hidden_dim
-            ),
-            self.get_discriminator_block(
-                input_channels=hidden_dim,
-                output_channels=hidden_dim * 2,
-            ),
-            self.get_discriminator_block(
-                input_channels=hidden_dim * 2,
-                output_channels=1,
-                final_layer=True,
-            ),
+            *self._get_discriminator_block(
+                channels, out_channels=64, normalize=False
+            ),  # C64
+            *self._get_discriminator_block(64, out_channels=128),  # 128
+            *self._get_discriminator_block(128, out_channels=256),  # C256
+            *self._get_discriminator_block(256, out_channels=512),  # C512
+            nn.ZeroPad2d(
+                (1, 0, 1, 0)
+            ),  # this is to keep same Height and Width after applying a kernel of 4*4
+            nn.Conv2d(in_channels=512, out_channels=1, kernel_size=4, padding=1),
         )
 
-    def get_discriminator_block(
-        self,
-        input_channels,
-        output_channels,
-        kernel_size=4,
-        stride=2,
-        final_layer=False,
-    ):
-        if not final_layer:
-            return nn.Sequential(
-                nn.Conv2d(input_channels, output_channels, kernel_size, stride),
-                nn.BatchNorm2d(output_channels),
-                nn.LeakyReLU(0.2, inplace=True),
+    def _get_discriminator_block(self, in_channels, out_channels, normalize=True):
+        layers = [
+            nn.Conv2d(
+                in_channels,
+                out_channels,
+                kernel_size=4,
+                stride=2,
+                padding=1,
             )
-        else:
-            return nn.Sequential(
-                nn.Conv2d(input_channels, output_channels, kernel_size, stride),
-            )
+        ]
 
-    def forward(self, image):
-        disc_pred = self.model(image)
+        if normalize:
+            layers += [nn.InstanceNorm2d(out_channels)]
 
-        return disc_pred.view(len(disc_pred), -1)
+        layers += [nn.LeakyReLU(0.2, inplace=True)]
 
-    def create_model(self, disc_input_dim, learning_rate: float = 0.001):
-        model = Discriminator(disc_input_dim).to(device)
-        criterion = nn.BCELoss()
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-        return model, criterion, optimizer
+        return layers
 
-    # def load_model_from_checkpoint(
-    #     self, checkpoint_path: str, input_shape: tuple, learning_rate: float = 0.001
-    # ):
-    #     model, criterion, optimizer = self.create_model(input_shape, learning_rate)
-    #     model.load_state_dict(torch.load(checkpoint_path))
-    #     model.eval()
-    #     return model
+    def forward(self, img):
+        return self.model(img)
