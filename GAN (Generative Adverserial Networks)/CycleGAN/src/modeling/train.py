@@ -1,9 +1,22 @@
-import matplotlib.pyplot as plt
-from tqdm.auto import tqdm
 import torch
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
+from modeling.gan import GAN
+from core.config import report_dir, Tensor
+
+import time
+import datetime
+
+from torch.autograd import Variable
+
+from torchvision.utils import save_image
 from torchvision.utils import make_grid
 
-from core.config import report_dir, device
+from IPython.display import clear_output
+
 
 class ModelTrainer:
     training_data_loader = None
@@ -18,124 +31,175 @@ class ModelTrainer:
     def __init__(
         self,
         training_data_loader,
-        model,
-        noise_shape,
-        images_shape,
-        criterion,
+        validation_data_loader,
+        model: GAN,
+        input_shape,
         epochs,
     ):
         self.training_data_loader = training_data_loader
+        self.val_dataloader = validation_data_loader
 
         self.model = model
 
-        self.criterion = criterion
-
         self.epochs = epochs
 
-        self.noise_shape = noise_shape
-        self.images_shape = images_shape
+        self.input_shape = input_shape
 
-    def _train_discriminator(self, real, labels):
-        curr_batch_size = len(real)
+    def _calculate_identity_loss(self, real_A, real_B):
+        # Recall the concept of identity loss (introduced in the paper)
+        # it specifies that the generators need to be aware of domain A and B
+        # and if fed an images from domain B (instead of the base A), it needs
+        # return the same image, as a proof that it has nothing to do to it
+        identity_loss_A = self.model.identity_criterion(
+            self.model.gen_BA(real_A), real_A
+        )  # notice how we are passing real_A (instead of real_B) even though
+        # the generator model is supposed to be fed real_B
+        # this loss measures the generator's awareness of the differences between
+        # the domains A and B
+        identity_loss_B = self.model.identity_criterion(
+            self.model.gen_AB(real_B), real_B
+        )  # we do the same with gen_AB
 
-        real = real.to(device)
+        return (identity_loss_A + identity_loss_B) / 2
 
-        one_hot_labels = torch.nn.functional.one_hot(
-            labels.to(device), num_classes=self.model.num_classes
-        )  # this should be (128, 10) (as labels are represented in one hot encoding)
+    def _calculate_GAN_loss(self, real_A, real_B, valid):
+        # loss for GAN_AB
+        fake_B = self.model.gen_AB(real_A)
+        loss_GAN_AB = self.model.criterion_GAN(self.model.disc_B(fake_B), valid)
 
-        image_one_hot_labels = one_hot_labels[:, :, None, None]
-        image_one_hot_labels = image_one_hot_labels.repeat(
-            1, 1, self.images_shape[1], self.images_shape[2]
-        )
+        # loss for GAN_BA
+        fake_A = self.model.gen_BA(real_B)
+        loss_GAN_BA = self.model.criterion_GAN(self.model.disc_A(fake_A), valid)
 
-        self.model.disc_opt.zero_grad()
+        return (loss_GAN_AB + loss_GAN_BA) / 2, fake_A, fake_B
 
-        fake_noise = torch.randn(curr_batch_size, self.noise_shape, device=device)
-        noise_and_labels = torch.cat(
-            (
-                fake_noise.float(),
-                one_hot_labels.float(),
-            ),
-            1,
-        )  # we concatentate fake noise (z) with y wrt to dimension 1 to form generator's input
-        fake = self.model.gen(noise_and_labels)
+    def _calculate_cycle_loss(self, real_A, real_B, fake_A, fake_B):
+        # now, we compute the cycle consistency loss
+        reconstructed_A = self.model.gen_BA(fake_B)
 
-        # now, we prepare the input for the discriminator
-        # we need to attach y to both fake and real images
-        # then, feed it to the discriminator
-        fake_image_and_labels = torch.cat(
-            (fake.float(), image_one_hot_labels.float()), 1
-        )
-        real_image_and_labels = torch.cat(
-            (real.float(), image_one_hot_labels.float()), 1
-        )
+        cycle_loss_A = self.model.cycle_criterion(real_A, reconstructed_A)
 
-        # we generate the predictions:
-        disc_fake_pred = self.model.disc(fake_image_and_labels.detach())  #!
-        disc_real_pred = self.model.disc(real_image_and_labels)
+        reconstructed_B = self.model.gen_AB(fake_A)
+        cycle_loss_B = self.model.cycle_criterion(real_B, reconstructed_B)
 
-        # we calculate the loss:
-        disc_fake_loss = self.criterion(disc_fake_pred, torch.ones_like(disc_fake_pred))
-        disc_real_loss = self.criterion(disc_real_pred, torch.ones_like(disc_real_pred))
+        return (cycle_loss_A + cycle_loss_B) / 2
 
-        # we calculate the mean of losses:
-        disc_loss = (disc_fake_loss + disc_real_loss) / 2
+    def _calculate_losses(self, real_A, real_B, valid, lambda_id, lambda_cyc):
+        identity_loss = self._calculate_identity_loss(real_A, real_B)
+        loss_GAN, fake_A, fake_B = self._calculate_GAN_loss(real_A, real_B, valid)
+        cycle_loss = self._calculate_cycle_loss(real_A, real_B, fake_A, fake_B)
 
-        # calculate the gradients and run a grad desc step
-        disc_loss.backward(retain_graph=True)
-        self.model.disc_opt.step()
+        # computing the total loss
+        total_loss = loss_GAN + lambda_id * identity_loss + lambda_cyc * cycle_loss
+        total_loss.backward()
+        self.model.optim_G.step()
 
-        self.loss_from_discriminator_model += [disc_loss.item()]
+        return total_loss, fake_A, fake_B
 
-        return fake, image_one_hot_labels
+    def _train_disc_A(self, real_A, fake_A, valid, fake):
+        self.model.optim_disc_A.zero_grad()
 
-    def _train_generator(self, fake, image_one_hot_labels):
-        self.model.gen_opt.zero_grad()
+        real_loss = self.model.criterion_GAN(self.model.disc_A(real_A), valid)
 
-        fake_image_and_labels = torch.cat(
-            (fake.float(), image_one_hot_labels.float()), 1
-        )
-        disc_fake_pred = self.model.disc(fake_image_and_labels)
+        fake_A_ = self.model.fake_A_buffer.push_and_pop(fake_A)
+        fake_loss = self.model.criterion_GAN(self.model.disc_A(fake_A_.detach()), fake)
 
-        gen_loss = self.criterion(disc_fake_pred, torch.ones_like(disc_fake_pred))
+        loss_disc_A = (real_loss + fake_loss) / 2
 
-        gen_loss.backward()
-        self.model.gen_opt.step()
+        loss_disc_A.backward()
+        self.model.optim_disc_A.step()
 
-        self.loss_from_generator_model += [gen_loss.item()]
+        return loss_disc_A
 
-    def train_model(self, display_range=1000):
-        step = 0
+    def _train_disc_B(self, real_B, fake_B, valid, fake):
+        self.model.optim_disc_B.zero_grad()
 
-        for epoch in range(self.epochs):
+        real_loss = self.model.criterion_GAN(self.model.disc_B(real_B), valid)
+
+        fake_B_ = self.model.fake_B_buffer.push_and_pop(fake_B)
+        fake_loss = self.model.criterion_GAN(self.model.disc_B(fake_B_.detach()), fake)
+
+        loss_disc_B = (real_loss + fake_loss) / 2
+
+        loss_disc_B.backward()
+        self.model.optim_disc_B.step()
+
+        return loss_disc_B
+
+    def _train_discriminators(self, real_A, real_B, fake_A, fake_B, valid, fake):
+        # now we train discriminator A
+        loss_disc_A = self._train_disc_A(real_A, fake_A, valid, fake)
+
+        # now we train discriminator B
+        loss_disc_B = self._train_disc_B(real_B, fake_B, valid, fake)
+
+        return (loss_disc_A + loss_disc_B) / 2
+
+    def train_model(self, lambda_id, lambda_cyc, start_epoch=0, sample_interval=100):
+        start = time.time()
+
+        if start_epoch >= self.epochs:
+            raise Exception("Starting Epoch exceeds Max Epochs")
+
+        for epoch in range(start_epoch, self.epochs):
             print(f"Currently training on Epoch {epoch+1}")
 
-            for real, labels in tqdm(self.training_data_loader):
-                fake, image_one_hot_labels = self._train_discriminator(real, labels)
+            for i, batch in enumerate(self.training_data_loader):
+                real_A = Variable(batch["A"].type(Tensor))
+                real_B = Variable(batch["B"].type(Tensor))
 
-                # we train the generator now:
-                self._train_generator(fake, image_one_hot_labels)
+                valid = Variable(
+                    Tensor(np.ones((real_A.size(0), *self.model.disc_A.output_shape))),
+                    requires_grad=True,
+                )
+                fake = Variable(
+                    Tensor(np.zeros((real_A.size(0), *self.model.disc_A.output_shape))),
+                    requires_grad=True,
+                )
 
-                if step % display_range == 0 and step > 0:
-                    gen_mean = sum(self.loss_from_generator_model[-display_range:]) / display_range
+                # set gans to train mode
+                self.model.gen_AB.train()  # gen_AB(real_A) = fake_B
+                self.model.gen_BA.train()  # gen_BA(real_B) = fake_A
 
-                    disc_mean = sum(self.loss_from_discriminator_model[-display_range:]) / display_range
+                # clean passed gradients values
+                self.model.optim_G.zero_grad()
 
-                    print(
-                        f"Step {step}: Generator loss: {gen_mean}, discriminator loss: {disc_mean}"
+                # we start by computing the losses
+                total_loss, fake_A, fake_B = self._calculate_losses(
+                    real_A, real_B, valid, lambda_id, lambda_cyc
+                )
+
+                loss_D = self._train_discriminators(
+                    real_A, real_B, fake_A, fake_B, valid, fake
+                )
+
+                batches_done = epoch * len(self.training_data_loader) + i
+                batches_left = (
+                    self.epochs * len(self.training_data_loader) - batches_done
+                )
+
+                time_left = datetime.timedelta(
+                    seconds=batches_left * (time.time() - start)
+                )
+                start = time.time()
+
+                print(
+                    "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f] ETA: %s"
+                    % (
+                        epoch,
+                        self.epochs,
+                        i,
+                        len(self.training_data_loader),
+                        loss_D.item(),
+                        total_loss.item(),
+                        time_left,
                     )
+                )
 
-                    self.plot_image(
-                        image_tensor=fake,
-                        filename=f"{report_dir}/fake_epoch_{epoch}_step_{step}.png",
-                    )
-
-                step += 1
-                
-        self.plot_loss()
-
-        print("Training completed with all epochs")
+                # If at sample interval save image
+            if batches_done % sample_interval == 0:
+                clear_output()
+                self.plot_output(self.save_img_samples(batches_done), 30, 40)
 
     def plot_loss(self):
         step_bins = 20
@@ -160,23 +224,32 @@ class ModelTrainer:
 
         plt.savefig(f"{report_dir}/loss_plot.png")
 
-    def plot_image(
-        self,
-        image_tensor,
-        num_images=25,
-        nrow=5,
-        show=False,
-        filename=f"{report_dir}/example.png",
-    ):
-        image_tensor = (image_tensor + 1) / 2
+    def plot_output(path, x, y):
+        img = mpimg.imread(path)
+        plt.figure(figsize=(x, y))
+        plt.imshow(img)
+        plt.show()
 
-        image_unflat = image_tensor.detach().cpu()
-
-        image_grid = make_grid(image_unflat[:num_images], nrow=nrow)
-
-        plt.imshow(image_grid.permute(1, 2, 0).squeeze())
-
-        plt.savefig(filename)
-
-        if show:
-            plt.show()
+    def save_img_samples(self, batches_done):
+        """Saves a generated sample from the test set"""
+        print("batches_done ", batches_done)
+        imgs = next(iter(self.val_dataloader))
+        self.model.gen_AB.eval()
+        self.model.gen_BA.eval()
+        real_A = Variable(imgs["A"].type(Tensor))
+        fake_B = self.model.gen_AB(real_A)
+        real_B = Variable(imgs["B"].type(Tensor))
+        fake_A = self.model.gen_BA(real_B)
+        # Arange images along x-axis
+        real_A = make_grid(real_A, nrow=16, normalize=True)
+        real_B = make_grid(real_B, nrow=16, normalize=True)
+        fake_A = make_grid(fake_A, nrow=16, normalize=True)
+        fake_B = make_grid(fake_B, nrow=16, normalize=True)
+        # Arange images along y-axis
+        image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
+        path = report_dir + "/%s.png" % (
+            batches_done
+        )  # Path when running in Google Colab
+        # path =  '/kaggle/working' + "/%s.png" % (batches_done)    # Path when running inside Kaggle
+        save_image(image_grid, path, normalize=False)
+        return path

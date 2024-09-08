@@ -19,7 +19,7 @@ from preparation.plotter import Plotter
 from core.config import plot_dir
 
 
-class DatasetLoader(Dataset):
+class DatasetLoader():
     def __init__(
         self,
         input_path,

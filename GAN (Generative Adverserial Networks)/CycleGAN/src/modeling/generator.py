@@ -2,6 +2,9 @@ import torch.nn as nn
 
 from modeling.residual_block import ResidualBlock
 
+from core.config import device
+
+
 class Generator(nn.Module):
     def __init__(self, input_shape, res_blocks_num):
         super(Generator, self).__init__()
@@ -24,11 +27,11 @@ class Generator(nn.Module):
 
         # resnet blocks
         for _ in range(res_blocks_num):
-            model += [ResidualBlock(in_channels)]  # fixed channels (256)
+            model += [ResidualBlock(out_channels)]  # fixed channels (256)
 
         # upsampling: u128, u64
         for _ in range(2):
-            out_channels //= 2 # 128 then 64
+            out_channels //= 2  # 128 then 64
 
             model += self._get_ud_conv(in_channels, out_channels, is_u=True)
 
@@ -44,6 +47,7 @@ class Generator(nn.Module):
 
     def _get_ud_conv(self, in_channels, out_channels, is_u=False):
         res = []
+        stride = 1 if is_u else 2
 
         if is_u:
             res = [
@@ -51,7 +55,9 @@ class Generator(nn.Module):
             ]
 
         return res + [
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(
+                in_channels, out_channels, kernel_size=3, stride=stride, padding=1
+            ),
             nn.InstanceNorm2d(out_channels),
             nn.ReLU(inplace=True),
         ]
@@ -71,3 +77,8 @@ class Generator(nn.Module):
                 nn.InstanceNorm2d(out_channels),
                 nn.ReLU(inplace=True),
             ]
+
+    def create_model(self, input_shape, resnet_blocks):
+        model = Generator(input_shape, resnet_blocks).to(device)
+
+        return model

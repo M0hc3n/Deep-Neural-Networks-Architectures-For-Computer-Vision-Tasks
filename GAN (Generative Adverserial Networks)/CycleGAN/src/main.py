@@ -1,29 +1,26 @@
 from preparation.transform import DatasetLoader
 
-# from modeling.gan import GAN
-# from modeling.train import ModelTrainer
+from core.hyperparameters import hp
+
+from modeling.gan import GAN
+from modeling.train import ModelTrainer
 
 if __name__ == "__main__":
     loaded_data = DatasetLoader(
         input_path="./data/raw/archive",
     )
 
-    loaded_data.show_example()
+    # loaded_data.show_example()
+    input_shape = (hp.channels, hp.img_size, hp.img_size)
 
-# model_obj = GAN(
-#     noise_shape=noise_shape,
-#     data_shape=train_data_loader.shape,
-#     num_classes=train_data_loader.num_classes,
-# )
-# model, criterion = model_obj.create_model()
+    model = GAN(input_shape)
 
-# model_trainer = ModelTrainer(
-#     model=model,
-#     criterion=criterion,
-#     training_data_loader=train_data_loader.data_loader,
-#     noise_shape=noise_shape,
-#     images_shape=train_data_loader.shape,
-#     epochs=20,
-# )
+    trainer = ModelTrainer(
+        training_data_loader=loaded_data.train_dataloader,
+        validation_data_loader=loaded_data.val_dataloader,
+        model=model,
+        input_shape=input_shape,
+        epochs=300,
+    )
 
-# model_trainer.train_model()
+    trainer.train_model(lambda_id=hp.lambda_id, lambda_cyc=hp.lambda_cyc)

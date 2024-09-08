@@ -1,5 +1,11 @@
 import torch.nn as nn
 
+import torch.optim as optim
+
+from core.config import device
+
+from core.hyperparameters import hp
+
 
 class Discriminator(nn.Module):
     def __init__(self, input_shape):
@@ -41,3 +47,14 @@ class Discriminator(nn.Module):
 
     def forward(self, img):
         return self.model(img)
+
+    def create_model(self, input_shape):
+        model = Discriminator(input_shape).to(device)
+
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=hp.lr,
+            betas=(hp.b1, hp.b2),
+        )
+
+        return model, optimizer

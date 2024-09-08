@@ -9,7 +9,7 @@ from torch.autograd import Variable
 # insted of just passing the latest generated image
 # this is a strategy to stabilitze training CycleGAN
 class ReplayBuffer:
-    def __init__(self, max_size):
+    def __init__(self, max_size=50):
         self.max_size = max_size
         self.data = []  # the buffer
 
