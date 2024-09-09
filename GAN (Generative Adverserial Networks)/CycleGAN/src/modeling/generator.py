@@ -38,7 +38,7 @@ class Generator(nn.Module):
             in_channels = out_channels
 
         # Output Layer:
-        model += self._get_input_output_conv(channels, out_channels, is_output=True)
+        model += self._get_input_output_conv(out_channels, channels, is_output=True)
 
         self.model = nn.Sequential(*model)
 

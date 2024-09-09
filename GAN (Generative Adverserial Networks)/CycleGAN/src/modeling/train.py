@@ -50,8 +50,11 @@ class ModelTrainer:
         # it specifies that the generators need to be aware of domain A and B
         # and if fed an images from domain B (instead of the base A), it needs
         # return the same image, as a proof that it has nothing to do to it
+        pred = self.model.gen_BA(real_A)
+
+        print(pred.shape, real_A.shape)
         identity_loss_A = self.model.identity_criterion(
-            self.model.gen_BA(real_A), real_A
+            pred, real_A
         )  # notice how we are passing real_A (instead of real_B) even though
         # the generator model is supposed to be fed real_B
         # this loss measures the generator's awareness of the differences between

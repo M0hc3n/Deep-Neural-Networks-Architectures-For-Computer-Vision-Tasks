@@ -5,6 +5,8 @@ from core.hyperparameters import hp
 from modeling.gan import GAN
 from modeling.train import ModelTrainer
 
+from torchsummary import summary
+
 if __name__ == "__main__":
     loaded_data = DatasetLoader(
         input_path="./data/raw/archive",
