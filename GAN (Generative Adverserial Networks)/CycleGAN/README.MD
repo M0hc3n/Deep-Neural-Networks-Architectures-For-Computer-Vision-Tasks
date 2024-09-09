@@ -1,6 +1,6 @@
 ## Cycle GAN:
 
-Cycle GAN is an architecture used in Image Translation to map a given image from a domain (Summer Images for e.g) to another domain (Winter Images). See the results below:
+Cycle GAN is an architecture used in Image Translation to map a given image from a domain (Summer Images for e.g) to another domain (Winter Images). See the results below (30 epochs):
 
 ![CycleGAN Results](./docs/reports/model/results.png)
 
