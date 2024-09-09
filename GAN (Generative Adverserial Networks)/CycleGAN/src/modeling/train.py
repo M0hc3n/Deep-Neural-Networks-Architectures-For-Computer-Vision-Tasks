@@ -159,6 +159,8 @@ class ModelTrainer:
                     Tensor(np.zeros((real_A.size(0), *self.model.disc_A.output_shape))),
                     requires_grad=True,
                 )
+                
+                print(real_A.shape, real_B.shape)
 
                 # set gans to train mode
                 self.model.gen_AB.train()  # gen_AB(real_A) = fake_B

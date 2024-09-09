@@ -38,7 +38,7 @@ class Generator(nn.Module):
             in_channels = out_channels
 
         # Output Layer:
-        model += self._get_input_output_conv(out_channels, channels, is_output=True)
+        model += self._get_input_output_conv(channels, out_channels, is_output=True)
 
         self.model = nn.Sequential(*model)
 
@@ -63,17 +63,16 @@ class Generator(nn.Module):
         ]
 
     def _get_input_output_conv(self, in_channels, out_channels, is_output=False):
-        res = [
-            nn.ReflectionPad2d(in_channels),
-            nn.Conv2d(in_channels, out_channels, 7),
-        ]
-
         if is_output:
-            return res + [
+            return [
+                nn.ReflectionPad2d(in_channels),
+                nn.Conv2d(out_channels, in_channels, 7),
                 nn.Tanh(),
             ]
         else:
-            return res + [
+            return [
+                nn.ReflectionPad2d(in_channels),
+                nn.Conv2d(in_channels, out_channels, 7),
                 nn.InstanceNorm2d(out_channels),
                 nn.ReLU(inplace=True),
             ]
