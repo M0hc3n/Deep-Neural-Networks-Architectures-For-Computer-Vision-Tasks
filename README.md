@@ -10,7 +10,7 @@ I'll be working more on this repository in the upcoming time, as I have some arc
 - [ ] Genrative Adversarial Networks (GANs)
   - [x] Deep Convolutional Genrative Adversarial Networks (DCGAN)
   - [x] Conditional Genrative Adversarial Networks (cGAN)
-  - [ ] Cycle Genrative Adversarial Networks (CycleGAN)
+  - [X] Cycle Genrative Adversarial Networks (CycleGAN)
   - [ ] Bicycle Genrative Adversarial Networks (BicycleGAN)
 - [x] Residual Networks
 - [ ] GoogleLeNet (Inception)
