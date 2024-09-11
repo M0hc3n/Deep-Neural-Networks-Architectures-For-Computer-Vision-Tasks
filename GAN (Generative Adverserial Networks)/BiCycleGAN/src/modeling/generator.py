@@ -1,83 +1,60 @@
-import torch.nn as nn
-
-from modeling.residual_block import ResidualBlock
+from torch import nn, cat
 
 from core.config import device
 
+from modeling.unet import UnetDown, UnetUp
+
 
 class Generator(nn.Module):
-    def __init__(self, input_shape, res_blocks_num):
+    def __init__(self, latent_dim, img_shape):
         super(Generator, self).__init__()
 
-        channels = input_shape[0]
-        out_channels = 64
+        channels, self.h, self.w = img_shape
 
-        # c7s1
-        model = self._get_input_output_conv(channels, out_channels)
+        self.fc = nn.Linear(latent_dim, self.h * self.w)
 
-        in_channels = out_channels
+        self.d1 = UnetDown(channels + 1, 64, normalize=False)
+        self.d2 = UnetDown(64, 128)
+        self.d3 = UnetDown(128, 256)
+        self.d4 = UnetDown(256, 512)
+        self.d5 = UnetDown(512, 512)
+        self.d6 = UnetDown(512, 512)
+        self.d6 = UnetDown(512, 512, normalize=False)
 
-        # downsampling: d128, d256
-        for _ in range(2):
-            out_channels *= 2  # 128 then 256
+        self.u1 = UnetUp(512, 512)
+        self.u2 = UnetUp(1024, 512)
+        self.u3 = UnetUp(1024, 512)
+        self.u4 = UnetUp(1024, 256)
+        self.u5 = UnetUp(512, 128)
+        self.u6 = UnetUp(256, 64)
 
-            model += self._get_ud_conv(in_channels, out_channels)
+        self.final = nn.Sequential(
+            nn.Upsample(scale_factor=2),
+            nn.Conv2d(128, channels, 3, stride=1, padding=1),
+            nn.Tanh(),
+        )
 
-            in_channels = out_channels
+    def forward(self, x, z):
+        z = self.fc(z).view(z.size(0), 1, self.h, self.w)
 
-        # resnet blocks
-        for _ in range(res_blocks_num):
-            model += [ResidualBlock(out_channels)]  # fixed channels (256)
+        d1 = self.d1(cat((x, z), 1))
+        d2 = self.d2(d1)
+        d3 = self.d3(d2)
+        d4 = self.d4(d3)
+        d5 = self.d5(d4)
+        d6 = self.d6(d5)
+        d7 = self.d7(d6)
 
-        # upsampling: u128, u64
-        for _ in range(2):
-            out_channels //= 2  # 128 then 64
+        u1 = self.u1(d7, d6)
+        u2 = self.u2(u1, d5)
+        u3 = self.u3(u2, d4)
+        u4 = self.u4(u3, d3)
+        u5 = self.u5(u4, d2)
+        u6 = self.u6(u5, d1)
 
-            model += self._get_ud_conv(in_channels, out_channels, is_u=True)
+        return self.final(u6)
 
-            in_channels = out_channels
+    # def create_model(self, input_shape, resnet_blocks):
+    #     model = Generator(input_shape, resnet_blocks).to(device)
 
-        # Output Layer:
-        model += self._get_input_output_conv(channels, out_channels, is_output=True)
-
-        self.model = nn.Sequential(*model)
-
-    def forward(self, x):
-        return self.model(x)
-
-    def _get_ud_conv(self, in_channels, out_channels, is_u=False):
-        res = []
-        stride = 1 if is_u else 2
-
-        if is_u:
-            res = [
-                nn.Upsample(scale_factor=2),
-            ]
-
-        return res + [
-            nn.Conv2d(
-                in_channels, out_channels, kernel_size=3, stride=stride, padding=1
-            ),
-            nn.InstanceNorm2d(out_channels),
-            nn.ReLU(inplace=True),
-        ]
-
-    def _get_input_output_conv(self, in_channels, out_channels, is_output=False):
-        if is_output:
-            return [
-                nn.ReflectionPad2d(in_channels),
-                nn.Conv2d(out_channels, in_channels, 7),
-                nn.Tanh(),
-            ]
-        else:
-            return [
-                nn.ReflectionPad2d(in_channels),
-                nn.Conv2d(in_channels, out_channels, 7),
-                nn.InstanceNorm2d(out_channels),
-                nn.ReLU(inplace=True),
-            ]
-
-    def create_model(self, input_shape, resnet_blocks):
-        model = Generator(input_shape, resnet_blocks).to(device)
-
-        return model
+    #     return model
