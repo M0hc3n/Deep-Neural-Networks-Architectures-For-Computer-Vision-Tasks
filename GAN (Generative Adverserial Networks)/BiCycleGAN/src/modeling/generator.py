@@ -54,7 +54,7 @@ class Generator(nn.Module):
 
         return self.final(u6)
 
-    # def create_model(self, input_shape, resnet_blocks):
-    #     model = Generator(input_shape, resnet_blocks).to(device)
+    def create_model(self, latent_dim, img_shape):
+        model = Generator(latent_dim, img_shape).to(device)
 
-    #     return model
+        return model
