@@ -1,10 +1,17 @@
 from torchvision.models import resnet18
 
-from torch import nn
+from torch import nn, exp
+
+from torch.autograd import Variable
+
+from core.config import Tensor
+from core.hyperparameters import hp
+
+import numpy as np
 
 
 class Encoder:
-    def __init__(self, latent_dim, input_shape):
+    def __init__(self, latent_dim):
         super(Encoder, self).__init__()
 
         self.feature_extractor = nn.Sequential(
@@ -24,4 +31,15 @@ class Encoder:
         mu = self.fc_mu(out)
         log_var = self.fc_log_var(out)
 
-        return mu, log_var
+        reparamterized_out = self.reparameterization(mu, log_var)
+
+        return mu, log_var, reparamterized_out
+
+    def reparameterization(self, mu, log_var):
+        std = exp(log_var / 2)
+
+        sampled_z = Variable(
+            Tensor(np.random.normal(0, 1, (mu.size(0), hp.latent_dim)))
+        )
+
+        return sampled_z * std + mu

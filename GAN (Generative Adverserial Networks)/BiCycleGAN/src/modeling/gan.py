@@ -1,13 +1,10 @@
 from modeling.generator import Generator
 from modeling.discriminator import Discriminator
-from modeling.replay_buffer import ReplayBuffer
 from modeling.encoder import Encoder
 
 import torch.nn as nn
-import torch.optim as optim
 
 from core.hyperparameters import hp
-import itertools
 
 
 class GAN(nn.Module):
@@ -18,17 +15,11 @@ class GAN(nn.Module):
 
         self._initialize_generator(input_shape)
 
-        self._initialize_encoder(input_shape)
+        self._initialize_encoder()
 
         self._initialize_discriminators(input_shape)
-        
-        # ! TODO: complete criterions
 
         self._initialize_criterions()
-
-        self._initialize_buffers()
-
-        self._initialize_lr_schedulers()
 
     def _initialize_generator(self, input_shape):
         # initialize generator
@@ -36,8 +27,8 @@ class GAN(nn.Module):
 
         self.gen.apply(self._initialize_conv_weights_normal)
 
-    def _initialize_encoder(self, input_shape):
-        self.enc = Encoder(hp.latent_dim, input_shape)
+    def _initialize_encoder(self):
+        self.enc = Encoder(hp.latent_dim)
 
     def _initialize_discriminators(self, input_shape):
         # initialize discriminators
@@ -48,14 +39,7 @@ class GAN(nn.Module):
         self.D_LR.apply(self._initialize_conv_weights_normal)
 
     def _initialize_criterions(self):
-        self.criterion_GAN = nn.MSELoss()  # GAN loss
-        self.identity_criterion = nn.L1Loss()  # identity loss
-        self.cycle_criterion = nn.L1Loss()  # cycle consistency
-
-    def _initialize_buffers(self):
-        # initialize buffers
-        self.fake_A_buffer = ReplayBuffer()
-        self.fake_B_buffer = ReplayBuffer()
+        self.mae_loss = nn.L1Loss()
 
     # def _initialize_lr_schedulers(self):
     #     # initialize learning rate schedulers (the need to use lr_lambda)
