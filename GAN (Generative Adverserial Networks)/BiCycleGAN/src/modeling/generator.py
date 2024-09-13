@@ -1,8 +1,10 @@
-from torch import nn, cat
+from torch import nn, cat, optim
 
 from core.config import device
 
 from modeling.unet import UnetDown, UnetUp
+
+from core.hyperparameters import hp
 
 
 class Generator(nn.Module):
@@ -54,7 +56,14 @@ class Generator(nn.Module):
 
         return self.final(u6)
 
-    def create_model(self, latent_dim, img_shape):
-        model = Generator(latent_dim, img_shape).to(device)
+    def create_model(self):
+        model = Generator(self.latent_dim, self.img_shape).to(device)
 
-        return model
+        # initializing the optimizer of generator
+        optim_G = optim.Adam(
+            self.model.parameters(),
+            lr=hp.lr,
+            betas=(hp.b1, hp.b2),
+        )
+
+        return model, optim_G

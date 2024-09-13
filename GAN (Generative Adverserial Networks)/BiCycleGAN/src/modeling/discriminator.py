@@ -1,6 +1,6 @@
 import torch.nn as nn
-
 import torch.optim as optim
+from torch import mean
 
 from core.config import device
 
@@ -11,6 +11,43 @@ class Discriminator(nn.Module):
     def __init__(self, input_shape):
         super(Discriminator, self).__init__()
 
+        channels, _, _ = input_shape
+
+        self.models = nn.ModuleList()
+
+        for i in range(3):
+            self.models.add_module(
+                "disc_%d" % i,
+                nn.Sequential(
+                    *self.get_discriminator_block(channels, 64, normalize=False),
+                    *self.get_discriminator_block(64, 128),
+                    *self.get_discriminator_block(128, 256),
+                    *self.get_discriminator_block(256, 512),
+                    nn.Conv2d(512, 1, kernel_size=3, padding=1),
+                ),
+            )
+
+        self.downsample = nn.AvgPool2d(
+            channels, stride=2, padding=[1, 1], count_include_pad=False
+        )
+
+    def forward(self, x):
+        outputs = []
+
+        for m in self.models:
+            outputs.append(m(x))
+            x = self.downsample(x)
+
+        return outputs
+
+    def compute_loss(self, x, x_true):
+        outputs = self.forward(x)
+
+        # we use L2 loss
+        loss = sum([mean((out - x_true) ** 2) for out in outputs])
+
+        return loss
+
     def get_discriminator_block(self, in_channels, out_channels, normalize=True):
         layers = [
             nn.Conv2d(in_channels, out_channels, kernel_size=4, stride=2, padding=1)
@@ -20,11 +57,11 @@ class Discriminator(nn.Module):
             layers += [nn.BatchNorm2d(out_channels, 0.8)]
 
         layers += [nn.LeakyReLU(0.2)]
-        
+
         return layers
 
-    def create_model(self, input_shape):
-        model = Discriminator(input_shape).to(device)
+    def create_model(self):
+        model = Discriminator(self.input_shape).to(device)
 
         optimizer = optim.Adam(
             model.parameters(),
