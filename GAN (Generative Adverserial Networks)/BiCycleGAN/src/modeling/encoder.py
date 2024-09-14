@@ -1,16 +1,16 @@
 from torchvision.models import resnet18
 
-from torch import nn, exp
+from torch import nn, exp, optim
 
 from torch.autograd import Variable
 
-from core.config import Tensor
+from core.config import Tensor, device
 from core.hyperparameters import hp
 
 import numpy as np
 
 
-class Encoder:
+class Encoder(nn.Module):
     def __init__(self, latent_dim):
         super(Encoder, self).__init__()
 
@@ -43,3 +43,15 @@ class Encoder:
         )
 
         return sampled_z * std + mu
+
+    def create_model(self):
+        model = Encoder(self.latent_dim).to(device)
+
+        # initializing the optimizer of generator
+        optim_E = optim.Adam(
+            model.parameters(),
+            lr=hp.lr,
+            betas=(hp.b1, hp.b2),
+        )
+
+        return model, optim_E

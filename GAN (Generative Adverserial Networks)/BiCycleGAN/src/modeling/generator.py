@@ -61,7 +61,7 @@ class Generator(nn.Module):
 
         # initializing the optimizer of generator
         optim_G = optim.Adam(
-            self.model.parameters(),
+            model.parameters(),
             lr=hp.lr,
             betas=(hp.b1, hp.b2),
         )

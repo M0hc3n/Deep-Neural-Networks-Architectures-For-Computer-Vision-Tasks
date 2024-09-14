@@ -28,7 +28,7 @@ class GAN(nn.Module):
         self.gen.apply(self._initialize_conv_weights_normal)
 
     def _initialize_encoder(self):
-        self.enc = Encoder(hp.latent_dim)
+        self.enc, self.optim_E = Encoder(hp.latent_dim).create_model()
 
     def _initialize_discriminators(self, input_shape):
         # initialize discriminators
