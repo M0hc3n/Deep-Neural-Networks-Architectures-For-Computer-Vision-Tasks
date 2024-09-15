@@ -45,6 +45,31 @@ class ModelTrainer:
 
         self.input_shape = input_shape
 
+    def _train_conditional_vae(self, real_A, real_B, valid):
+        mu, logvar, reparamterized_out = self.model.enc(real_B)
+
+        fake_B = self.model.gen(real_A, reparamterized_out)
+
+        pixel_wise_l1_loss_vae = self.model.mae_loss(real_B, fake_B)
+
+        loss_kl = 0.5 * torch.sum(torch.exp(logvar) + mu**2 - logvar - 1)
+
+        loss_vae_GAN = self.model.D_VAE.compute_loss(fake_B, valid)
+
+        return fake_B, pixel_wise_l1_loss_vae, loss_kl, loss_vae_GAN
+
+    def _sample_from_normal(self, size):
+        return Variable(Tensor(np.random.normal(0, 1, size)))
+
+    def _train_conditional_lr(self, real_A, valid):
+        sampled_z = self._sample_from_normal(size=(real_A.size(0), hp.latent_dim))
+
+        _fake_B = self.model.gen(real_A, sampled_z)
+
+        loss_clr_GAN = self.model.D_LR.compute_loss(_fake_B, valid)
+
+        return sampled_z, _fake_B, loss_clr_GAN
+
     def train_model(
         self, lambda_pix, lambda_kl, lambda_latent, start_epoch=0, sample_interval=100
     ):
@@ -67,24 +92,14 @@ class ModelTrainer:
                 self.model.optim_E.zero_grad()
 
                 # we train the first wheel of the bicyle: ConditionalVAE
-                mu, logvar, reparamterized_out = self.model.enc(real_B)
-
-                fake_B = self.model.gen(real_A, reparamterized_out)
-
-                pixel_wise_l1_loss_vae = self.model.mae_loss(real_B, fake_B)
-
-                loss_kl = 0.5 * torch.sum(torch.exp(logvar) + mu**2 - logvar - 1)
-
-                loss_vae_GAN = self.model.D_VAE.compute_loss(fake_B, valid)
-
-                # we train the second wheel of the bicycle: Conditional LR
-                sampled_z = Variable(
-                    Tensor(np.random.normal(0, 1, (real_A.size(0), hp.latent_dim)))
+                fake_B, pixel_wise_l1_loss_vae, loss_kl, loss_vae_GAN = (
+                    self._train_conditional_vae(real_A, real_B, valid)
                 )
 
-                _fake_B = self.model.gen(real_A, sampled_z)
-
-                loss_clr_GAN = self.model.D_LR.compute_loss(_fake_B, valid)
+                # we train the second wheel of the bicycle: Conditional LR
+                sampled_z, _fake_B, loss_clr_GAN = self._train_conditional_lr(
+                    real_A, valid
+                )
 
                 # calculate generator + encoder loss:
                 gen_enc_loss = (
