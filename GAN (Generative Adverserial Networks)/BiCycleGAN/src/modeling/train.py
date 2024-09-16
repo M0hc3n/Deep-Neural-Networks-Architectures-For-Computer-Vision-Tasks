@@ -70,9 +70,98 @@ class ModelTrainer:
 
         return sampled_z, _fake_B, loss_clr_GAN
 
-    def train_model(
-        self, lambda_pix, lambda_kl, lambda_latent, start_epoch=0, sample_interval=100
+    def _calculate_gen_enc_losses(
+        self,
+        loss_vae_GAN,
+        loss_clr_GAN,
+        pixel_wise_l1_loss_vae,
+        loss_kl,
+        lambda_pix,
+        lambda_kl,
     ):
+        gen_enc_loss = (
+            loss_vae_GAN
+            + loss_clr_GAN
+            + lambda_pix * pixel_wise_l1_loss_vae
+            + lambda_kl * loss_kl
+        )
+
+        gen_enc_loss.backward(retain_graph=True)
+        self.model.optim_E.step()
+
+        return gen_enc_loss
+
+    def _calculate_gen_loss(self, _fake_B, sampled_z, lambda_latent):
+        _mu, _, _ = self.model.enc(_fake_B)
+        loss_latent = lambda_latent * self.model.mae_loss(_mu, sampled_z)
+
+        loss_latent.backward()
+        self.model.optim_G.step()
+
+        return loss_latent
+
+    def _train_discriminators(self, real_B, fake_B, _fake_B, fake, valid, is_vae):
+        if is_vae:
+            self.model.optim_D_VAE.zero_grad()
+
+            loss_D_VAE = self.model.D_VAE.compute_loss(
+                real_B, fake
+            ) + self.model.D_VAE.compute_loss(fake_B.detach(), valid)
+
+            loss_D_VAE.backward()
+            self.model.optim_D_VAE.step()
+
+            return loss_D_VAE
+
+        else:
+            self.model.optim_D_LR.zero_grad()
+
+            loss_D_LR = self.model.D_LR.compute_loss(
+                real_B, fake
+            ) + self.model.D_LR.compute_loss(_fake_B.detach(), valid)
+
+            loss_D_LR.backward()
+            self.model.optim_D_LR.step()
+
+            return loss_D_LR
+
+    def _handle_logger(
+        self,
+        epoch,
+        i,
+        loss_D_VAE,
+        loss_D_LR,
+        gen_enc_loss,
+        pixel_wise_l1_loss_vae,
+        loss_kl,
+        loss_latent,
+        time_left,
+        batches_done,
+    ):
+        # Print log
+        sys.stdout.write(
+            "\r[Epoch %d/%d] [Batch %d/%d] [D VAE_loss: %f, LR_loss: %f] [G loss: %f, pixel: %f, kl: %f, latent: %f] ETA: %s"
+            % (
+                epoch,
+                hp.n_epochs,
+                i,
+                len(self.training_data_loader),
+                loss_D_VAE.item(),
+                loss_D_LR.item(),
+                gen_enc_loss.item(),
+                pixel_wise_l1_loss_vae.item(),
+                loss_kl.item(),
+                loss_latent.item(),
+                time_left,
+            )
+        )
+
+        # If at sample interval save image
+        if batches_done % hp.sample_interval == 0:
+            clear_output()
+            self.plot_output(self.sample_images(batches_done), 30, 10)
+
+    def train_model(self, lambda_pix, lambda_kl, lambda_latent, start_epoch=0):
         start = time.time()
 
         valid = 1
@@ -102,42 +191,39 @@ class ModelTrainer:
                 )
 
                 # calculate generator + encoder loss:
-                gen_enc_loss = (
-                    loss_vae_GAN
-                    + loss_clr_GAN
-                    + lambda_pix * pixel_wise_l1_loss_vae
-                    + lambda_kl * loss_kl
+                gen_enc_loss = self._calculate_gen_enc_losses(
+                    loss_vae_GAN,
+                    loss_clr_GAN,
+                    pixel_wise_l1_loss_vae,
+                    loss_kl,
+                    lambda_pix,
+                    lambda_kl,
                 )
 
-                gen_enc_loss.backward(retain_graph=True)
-                self.model.optim_E.step()
-
                 # calculate generator only loss:
-                _mu, _, _ = self.model.enc(_fake_B)
-                loss_latent = lambda_latent * self.model.mae_loss(_mu, sampled_z)
-
-                loss_latent.backward()
-                self.model.optim_G.step()
+                loss_latent = self._calculate_gen_loss(
+                    _fake_B, sampled_z, lambda_latent
+                )
 
                 # train discriminator: (cVAE)
-                self.model.optim_D_VAE.zero_grad()
-
-                loss_D_VAE = self.model.D_VAE.compute_loss(
-                    real_B, fake
-                ) + self.model.D_VAE.compute_loss(fake_B.detach(), valid)
-
-                loss_D_VAE.backward()
-                self.model.optim_D_VAE.step()
+                loss_D_VAE = self._train_discriminators(
+                    real_B=real_B,
+                    fake_B=fake_B,
+                    _fake_B=_fake_B,  # not required
+                    fake=fake,
+                    valid=valid,
+                    is_vae=True,
+                )
 
                 # train discriminator: (cLR)
-                self.model.optim_D_LR.zero_grad()
-
-                loss_D_LR = self.model.D_LR.compute_loss(
-                    real_B, fake
-                ) + self.model.D_LR.compute_loss(_fake_B.detach(), valid)
-
-                loss_D_LR.backward()
-                self.model.optim_D_LR.step()
+                loss_D_LR = self._train_discriminators(
+                    real_B=real_B,
+                    fake_B=fake_B,  # not required
+                    _fake_B=_fake_B,
+                    fake=fake,
+                    valid=valid,
+                    is_vae=False,
+                )
 
                 # Determine approximate time left
                 batches_done = epoch * len(self.training_data_loader) + i
@@ -149,30 +235,20 @@ class ModelTrainer:
                 )
                 start = time.time()
 
-                # Print log
-                sys.stdout.write(
-                    "\r[Epoch %d/%d] [Batch %d/%d] [D VAE_loss: %f, LR_loss: %f] [G loss: %f, pixel: %f, kl: %f, latent: %f] ETA: %s"
-                    % (
-                        epoch,
-                        hp.n_epochs,
-                        i,
-                        len(self.training_data_loader),
-                        loss_D_VAE.item(),
-                        loss_D_LR.item(),
-                        gen_enc_loss.item(),
-                        pixel_wise_l1_loss_vae.item(),
-                        loss_kl.item(),
-                        loss_latent.item(),
-                        time_left,
-                    )
+                self._handle_logger(
+                    epoch,
+                    i,
+                    loss_D_VAE,
+                    loss_D_LR,
+                    gen_enc_loss,
+                    pixel_wise_l1_loss_vae,
+                    loss_kl,
+                    loss_latent,
+                    time_left,
+                    batches_done,
                 )
 
-                # If at sample interval save image
-                if batches_done % hp.sample_interval == 0:
-                    clear_output()
-                    self.visualise_output(self.sample_images(batches_done), 30, 10)
-
-    def plot_output(path, x, y):
+    def plot_output(self, path, x, y):
         img = mpimg.imread(path)
         plt.figure(figsize=(x, y))
         plt.imshow(img)
@@ -187,7 +263,7 @@ class ModelTrainer:
         # So in this case each subsequent set of images from val_dataloader
         img_samples = None
         # For below line to work, I need to create a folder named 'maps' in the root_path
-        path = "/content/%s/%s.png" % ("maps", batches_done)
+        path = f"/{report_dir}/maps/{batches_done}.png"
         for img_A, img_B in zip(imgs["A"], imgs["B"]):
             # Repeat input image by number of desired columns
             real_A = img_A.view(1, *img_A.shape).repeat(hp.latent_dim, 1, 1, 1)

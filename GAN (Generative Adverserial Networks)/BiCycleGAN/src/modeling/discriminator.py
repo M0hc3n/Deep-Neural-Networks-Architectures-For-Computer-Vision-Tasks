@@ -11,7 +11,7 @@ class Discriminator(nn.Module):
     def __init__(self, input_shape):
         super(Discriminator, self).__init__()
 
-        channels, _, _ = input_shape
+        self.channels, self.h, self.w = input_shape
 
         self.models = nn.ModuleList()
 
@@ -19,7 +19,7 @@ class Discriminator(nn.Module):
             self.models.add_module(
                 "disc_%d" % i,
                 nn.Sequential(
-                    *self.get_discriminator_block(channels, 64, normalize=False),
+                    *self.get_discriminator_block(self.channels, 64, normalize=False),
                     *self.get_discriminator_block(64, 128),
                     *self.get_discriminator_block(128, 256),
                     *self.get_discriminator_block(256, 512),
@@ -28,7 +28,7 @@ class Discriminator(nn.Module):
             )
 
         self.downsample = nn.AvgPool2d(
-            channels, stride=2, padding=[1, 1], count_include_pad=False
+            self.channels, stride=2, padding=[1, 1], count_include_pad=False
         )
 
     def forward(self, x):
@@ -61,7 +61,7 @@ class Discriminator(nn.Module):
         return layers
 
     def create_model(self):
-        model = Discriminator(self.input_shape).to(device)
+        model = Discriminator((self.channels, self.h, self.w)).to(device)
 
         optimizer = optim.Adam(
             model.parameters(),

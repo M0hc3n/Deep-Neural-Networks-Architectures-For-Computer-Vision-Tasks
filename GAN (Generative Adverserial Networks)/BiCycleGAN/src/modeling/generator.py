@@ -11,17 +11,17 @@ class Generator(nn.Module):
     def __init__(self, latent_dim, img_shape):
         super(Generator, self).__init__()
 
-        channels, self.h, self.w = img_shape
+        self.channels, self.h, self.w = img_shape
 
         self.fc = nn.Linear(latent_dim, self.h * self.w)
 
-        self.d1 = UnetDown(channels + 1, 64, normalize=False)
+        self.d1 = UnetDown(self.channels + 1, 64, normalize=False)
         self.d2 = UnetDown(64, 128)
         self.d3 = UnetDown(128, 256)
         self.d4 = UnetDown(256, 512)
         self.d5 = UnetDown(512, 512)
         self.d6 = UnetDown(512, 512)
-        self.d6 = UnetDown(512, 512, normalize=False)
+        self.d7 = UnetDown(512, 512, normalize=False)
 
         self.u1 = UnetUp(512, 512)
         self.u2 = UnetUp(1024, 512)
@@ -32,7 +32,7 @@ class Generator(nn.Module):
 
         self.final = nn.Sequential(
             nn.Upsample(scale_factor=2),
-            nn.Conv2d(128, channels, 3, stride=1, padding=1),
+            nn.Conv2d(128, self.channels, 3, stride=1, padding=1),
             nn.Tanh(),
         )
 
@@ -57,7 +57,7 @@ class Generator(nn.Module):
         return self.final(u6)
 
     def create_model(self):
-        model = Generator(self.latent_dim, self.img_shape).to(device)
+        model = Generator(hp.latent_dim, (self.channels, self.h, self.w)).to(device)
 
         # initializing the optimizer of generator
         optim_G = optim.Adam(

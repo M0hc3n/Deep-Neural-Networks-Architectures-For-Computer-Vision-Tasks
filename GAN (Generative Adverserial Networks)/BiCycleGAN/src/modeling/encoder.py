@@ -27,6 +27,7 @@ class Encoder(nn.Module):
     def forward(self, x):
         out = self.feature_extractor(x)
         out = self.pool(out)
+        out = out.view(out.size(0), -1)
 
         mu = self.fc_mu(out)
         log_var = self.fc_log_var(out)
@@ -45,7 +46,7 @@ class Encoder(nn.Module):
         return sampled_z * std + mu
 
     def create_model(self):
-        model = Encoder(self.latent_dim).to(device)
+        model = Encoder(hp.latent_dim).to(device)
 
         # initializing the optimizer of generator
         optim_E = optim.Adam(

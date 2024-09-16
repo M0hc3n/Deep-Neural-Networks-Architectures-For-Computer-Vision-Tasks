@@ -45,7 +45,7 @@ def convert_to_notebook(project_dir, main_file, folder_order, last_files=None):
 
         add_code_cell(main_code)
 
-    with open("./src/cycleGAN.ipynb", "w") as f:
+    with open("./src/biCycleGAN.ipynb", "w") as f:
         nbf.write(nb, f)
 
 
