@@ -1,7 +1,7 @@
 from preparation.extract import VOCDatasetExtractor 
 # from preparation.transform import DatasetTransformer
 # from torch.utils.data import DataLoader
-# from modeling.model import Model
+from modeling.model import Yolo
 # from modeling.train import ModelTrainer
 
 import torchvision.transforms as transforms
@@ -31,3 +31,7 @@ train_loader = DataLoader(
 )
 
 print(train_dataset)
+
+model = Yolo(split_size=7, num_boxes=2, num_classes=20)
+
+print(model)
