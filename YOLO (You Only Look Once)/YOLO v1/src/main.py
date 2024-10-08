@@ -1,22 +1,33 @@
-from preparation.extract import ExtractDataset 
-from preparation.transform import DatasetTransformer
+from preparation.extract import VOCDatasetExtractor 
+# from preparation.transform import DatasetTransformer
+# from torch.utils.data import DataLoader
+# from modeling.model import Model
+# from modeling.train import ModelTrainer
+
+import torchvision.transforms as transforms
+
 from torch.utils.data import DataLoader
-from modeling.model import Model
-from modeling.train import ModelTrainer
 
-MNISTFashion = ExtractDataset(input_dir="./data/raw")
 
-train_data = DatasetTransformer(MNISTFashion.train_data, MNISTFashion.train_targets)
-test_data = DatasetTransformer(MNISTFashion.test_data, MNISTFashion.test_targets)
+class Compose:
+    def __init__(self, transforms):
+        self.transforms = transforms
 
-train_loaded_data = DataLoader(train_data, batch_size=32, shuffle=True)
-test_loaded_data = DataLoader(test_data, batch_size=32, shuffle=True)
+    def __call__(self, img, bboxes):
+        for transform in self.transforms:
+            img, bboxes = transform(img), bboxes
+        return img, bboxes
 
-model_obj = Model()
-model, criterion, optimizer = model_obj.create_model()
+transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(), ])
 
-model_trainer = ModelTrainer(train_loaded_data,test_loaded_data , model, criterion, optimizer, epochs=10)
-model_trainer.train_model()
+train_dataset = VOCDatasetExtractor(csv_file="./data/loader/train.csv", image_dir="./data/loader/data/images", label_dir="./data/loader/data/labels")
+train_loader = DataLoader(
+    dataset=train_dataset, 
+    batch_size=16,
+    num_workers=2,
+    pin_memory=True,
+    shuffle=True,
+    drop_last=True,
+)
 
-model_trainer.plot_trainning_report()
-model_trainer.plot_model_weights()
+print(train_dataset)
