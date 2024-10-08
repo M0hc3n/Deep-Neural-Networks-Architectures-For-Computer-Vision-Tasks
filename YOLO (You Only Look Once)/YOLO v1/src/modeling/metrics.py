@@ -1,32 +1,48 @@
 import torch
 
-""" torch.no_grad() impacts the autograd engine and deactivate it. It will reduce memory usage and speed up computations but you won’t be able to backprop (which you don’t want in an eval script). 
-So torch.no_grad() basically skips the gradient calculation over the weights. That means you are not changing any weight in the specified layers. If you are trainin pre-trained model, it's ok to use torch.no_grad() on all the layers except fully connected layer or classifier layer.
-
-"""
-@torch.no_grad()
-
-def accuracy(x, y, model):
-  
-    # model.eval() will notify all your layers that you are in eval mode,
-    # that way, batchnorm or dropout layers will work in eval mode instead of training mode.  
-    model.eval()
+def intersection_over_union(boxes_pred, boxes_label):
     
-    # get the prediction matrix for a tensor of `x` images
-    prediction = model(x)[0]
+    box_pred_x1 = boxes_pred[..., 0:1] - boxes_pred[..., 2:3] / 2
+    box_pred_y1 = boxes_pred[..., 1:2] - boxes_pred[..., 3:4] / 2
     
-    # Now compute if the location of maximum in each row coincides with ground truth
-    # For that firs I am identifying the argmax index corresponding to each row with prediction.max(-1)
-    max_values, argmaxes = prediction.max(-1)
+    box_pred_x2 = boxes_pred[..., 0:1] + boxes_pred[..., 2:3] / 2
+    box_pred_y2 = boxes_pred[..., 1:2] + boxes_pred[..., 3:4] / 2
+    
+    
+    box_label_x1 = boxes_label[..., 0:1] - boxes_label[..., 2:3] / 2
+    box_label_y1 = boxes_label[..., 1:2] - boxes_label[..., 3:4] / 2
+    
+    box_label_x2 = boxes_label[..., 0:1] + boxes_label[..., 2:3] / 2
+    box_label_y2 = boxes_label[..., 1:2] + boxes_label[..., 3:4] / 2
 
-    """ comparing argmaxes with the ground truth through with argmaxes == y
-    to check that each row is predicted correctly.  """
+    x1 = torch.max(box_pred_x1, box_label_x1)
+    y1 = torch.max(box_pred_y1, box_label_y1)
     
-    is_correct = argmaxes == y
+    x2 = torch.max(box_pred_x2, box_label_x2)
+    y2 = torch.max(box_pred_y2, box_label_y2)
     
-    return is_correct.cpu().numpy().tolist()
+    intersection = (x2 - x1).clamp(0) * (y2 - y1).clamp(0)
+    box_pred_area = abs((box_pred_x2 - box_pred_x1) * (box_pred_y2 - box_pred_y1))
+    box_label_area = abs((box_label_x2 - box_label_x1) * (box_label_y2 - box_label_y1))
+    
+    return intersection / (box_pred_area + box_label_area - intersection + 1e-6) # to avoid null division
 
-def test_loss(x, y, model, criterion):
-    prediction = model(x)[0]
-    test_loss = criterion(prediction, y)
-    return test_loss.item()
+class Loss(torch.nn.Module):
+    
+    def __init__(self, S=7, B=2, C=20):
+        super(Loss, self).__init__()
+        
+        self.S = S
+        self.B = B
+        self.C = C
+        
+        # params values from the paper
+        self.lambda_cord = 0.5
+        self.lambda_noobj = 5
+        
+    def forward(self, preds, target):
+        
+        # converts from (batch size, S*S*(C+B*5)) to (batch size, S, S,C+B*5)
+        preds = preds.reshape(-1, self.S, self.S, self.C + self.B * 5) 
+        
+        
