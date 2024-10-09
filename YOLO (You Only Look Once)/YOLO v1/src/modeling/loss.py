@@ -25,10 +25,10 @@ class Loss(torch.nn.Module):
         iou_box_1 = intersection_over_union(preds[..., 21:25], target[..., 21:25])
         iou_box_2 = intersection_over_union(preds[..., 26:30], target[..., 21:25])
         
-        ious = torch.concat([iou_box_1.unsequeeze(0), iou_box_2.unsequeeze(0)], dim=0)
+        ious = torch.concat([iou_box_1.unsqueeze(0), iou_box_2.unsqueeze(0)], dim=0)
         
         iou_maxes, bestbox = torch.max(ious, dim=0)
-        exists_box = target[..., 20].unsequeeze(3)
+        exists_box = target[..., 20].unsqueeze(3)
         
         
         box_predictions = exists_box * ( bestbox * preds[..., 26:30] + (1 - bestbox) * preds[..., 21:25])
@@ -38,8 +38,8 @@ class Loss(torch.nn.Module):
         box_targets[..., 2:4] = torch.sign(box_targets[..., 2:4])
         
         box_loss = self.mse(
-            torch.flatten(box_predictions, end_dim==-2),
-            torch.flatten(box_targets, end_dim==-2)
+            torch.flatten(box_predictions, end_dim=-2),
+            torch.flatten(box_targets, end_dim=-2)
         ) 
         
         # object loss

@@ -43,7 +43,7 @@ class ModelTrainer:
 
 
             self.optimizer.zero_grad()
-            los.backward()
+            loss.backward()
             self.optimizer.step()
             
             looper.set_postfix(loss=loss.item())
