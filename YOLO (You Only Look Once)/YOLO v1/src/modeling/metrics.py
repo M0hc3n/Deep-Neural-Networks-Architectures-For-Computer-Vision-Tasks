@@ -1,5 +1,7 @@
 import torch
 
+from collections import Counter
+
 def intersection_over_union(boxes_pred, boxes_label):
     
     box_pred_x1 = boxes_pred[..., 0:1] - boxes_pred[..., 2:3] / 2
@@ -27,22 +29,89 @@ def intersection_over_union(boxes_pred, boxes_label):
     
     return intersection / (box_pred_area + box_label_area - intersection + 1e-6) # to avoid null division
 
-class Loss(torch.nn.Module):
+def non_max_suppression(preds, iou_threshold, prob_threshold):
+    bboxes = [box for box in preds if box[1] > prob_threshold]
+    bboxes = sorted(bboxes, key=lambda x: x[1], reverse=True)
+    result = []
     
-    def __init__(self, S=7, B=2, C=20):
-        super(Loss, self).__init__()
+    while bboxes:
+        chosen_box = bboxes.pop(0)
         
-        self.S = S
-        self.B = B
-        self.C = C
+        bboxes = [
+            box 
+            for box in bboxes
+            if box[0] != chosen_box[0] # need to be of different class
+            or intersection_over_union(
+                boxes_pred=torch.tensor(box[2:]),
+                boxes_label=torch.tensor(chosen_box[2:])
+            ) < iou_threshold
+        ]
         
-        # params values from the paper
-        self.lambda_cord = 0.5
-        self.lambda_noobj = 5
+        result.append(chosen_box)
+
+    return result
+
+def mean_average_precision(pred, target, iou_threshold=0.5, num_classes=20):
+    avg_precisions = []
+    
+    for c in range(num_classes):
+        detections = [detection for detection in pred if detection[1] == c]
+        ground_truths = [gt for gt in target if gt[1] == c]
         
-    def forward(self, preds, target):
+        # keep dict of trainning set indexes as keys, with their occurences as values
+        amount_bboxes = Counter([gt[0] for gt in ground_truths])
         
-        # converts from (batch size, S*S*(C+B*5)) to (batch size, S, S,C+B*5)
-        preds = preds.reshape(-1, self.S, self.S, self.C + self.B * 5) 
+        # now the values are a tensor of zeros repeated value times
+        for key, val in amount_bboxes.items():
+            amount_bboxes[key] = torch.zeros(val)
+            
+        # sort by probabilities (at index 2)
+        detections.sort(key=lambda x: x[2], reverse=True)
+        TP = torch.zeros((len(detections)))
+        FP = torch.zeros((len(detections)))
+        total_true_bboxes = len(ground_truths)
         
+        if len(total_true_bboxes) < 1:
+            continue
+        
+        for detection_idx, detection in enumerate(detections):
+            ground_truth_img = [
+                bbox for bbox in ground_truths if bbox[0] == detection[0]
+            ]
+            
+            num_gts = len(ground_truth_img)
+            best_iou = 0
+            
+            for idx, gt_img in enumerate(ground_truth_img):
+                iou = intersection_over_union(
+                    torch.tensor(detection[3:]),
+                    torch.tensor(gt_img[3:]),
+                )
+                
+                if iou > best_iou:
+                    best_iou = iou
+                    bst_gt_idx = idx
+            
+            if best_iou > iou_threshold:
+                if amount_bboxes[detection[0]][bst_gt_idx] == 0:
+                    amount_bboxes[detection[0]][bst_gt_idx] = 1
+                    TP[detection_idx] = 1
+                else:
+                    FP[detection_idx] = 1
+                    
+            else:
+                FP[detection_idx] = 1
+        
+        TP_cumulative_sum = torch.cumsum(TP, dim=0)
+        FP_cumulative_sum = torch.cumsum(FP, dim=0)
+        
+        recalls = TP_cumulative_sum / (total_true_bboxes + 1e-6)
+        precisions = FP_cumulative_sum / (TP_cumulative_sum + FP_cumulative_sum + 1e-6)
+        
+        recalls = torch.cat((torch.tensor([0]), recalls))
+        precisions = torch.cat((torch.tensor([1]), precisions))
+        
+        avg_precisions.append(torch.trapz(precisions, recalls)) 
+    
+    return sum(avg_precisions) / len(avg_precisions)
         
