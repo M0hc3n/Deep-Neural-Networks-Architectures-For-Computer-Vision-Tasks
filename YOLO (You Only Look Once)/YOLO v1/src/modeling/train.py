@@ -41,6 +41,7 @@ class ModelTrainer:
             
             batch_loss.append(loss.item())
 
+
             self.optimizer.zero_grad()
             los.backward()
             self.optimizer.step()
@@ -51,7 +52,7 @@ class ModelTrainer:
 
     def train_model(self):
         
-        for epoch in self.epochs:
+        for epoch in range(self.epochs):
             pred_boxes, target_boxes = get_bboxes(self.training_data_loader, self.model, iou_threshold=0.5, threshold=0.4)
             
             mean_avg_precision = mean_average_precision(

@@ -16,13 +16,15 @@ transform = Compose([transforms.Resize((448, 448)), transforms.ToTensor(), ])
 train_dataset = VOCDatasetExtractor(
     csv_file="./data/loader/train.csv", 
     image_dir="./data/loader/data/images", 
-    label_dir="./data/loader/data/labels"
+    label_dir="./data/loader/data/labels", 
+    transform=transform
 )
 
 test_dataset = VOCDatasetExtractor(
     csv_file="./data/loader/test.csv", 
     image_dir="./data/loader/VOCdevkit/VOC2007/JPEGImages", 
-    label_dir="./data/loader/VOCdevkit/VOC2007/labels"
+    label_dir="./data/loader/VOCdevkit/VOC2007/labels", 
+    transform=transform
 )
 
 train_loader = DataLoader(

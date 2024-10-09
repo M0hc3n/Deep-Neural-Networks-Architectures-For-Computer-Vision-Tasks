@@ -5,6 +5,9 @@ from torch import zeros, tensor
 
 import pandas as pd
 
+from PIL import Image
+import os
+
 class VOCDatasetExtractor(Dataset):
     def __init__(self, csv_file, image_dir, label_dir, S=7, B=2, C=20, transform=None):
         """
@@ -43,7 +46,7 @@ class VOCDatasetExtractor(Dataset):
 
         image_path = os.path.join(self.image_dir, self.annotations.iloc[index, 0])
         image = Image.open(image_path)
-        boxes = torch.tensor(boxes)
+        boxes = tensor(boxes)
 
         if self.transform:
             image, boxes = self.transform(image, boxes)
@@ -74,7 +77,7 @@ class VOCDatasetExtractor(Dataset):
 
                 label_matrix[i, j, class_label] = 1 # we found the object
 
-            return image, label_matrix
+        return image, label_matrix
     
 
 

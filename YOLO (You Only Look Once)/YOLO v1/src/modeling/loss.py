@@ -1,5 +1,6 @@
-from modeling.metrics import intersection_over_union
+import torch
 
+from modeling.metrics import intersection_over_union
 
 class Loss(torch.nn.Module):
     

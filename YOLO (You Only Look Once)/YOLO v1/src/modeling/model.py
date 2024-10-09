@@ -15,21 +15,24 @@ class Yolo(nn.Module):
         self.net = self._build_layers()
         
         # reset the in_channels value
-        self.in_channels = in_channels
+        # self.in_channels = in_channels
         
         self.fcs = self._build_fcs(**kwargs)
         
     def _get_conv_layer(self, layer):
-        return [
+        res = [
             CNNBlock(
             in_channels=self.in_channels, 
             out_channels=layer[1], 
-            kernel_size=layer[0], 
+            kernel_size=layer[0],
             stride=layer[2], 
             padding=layer[3]
         )]
         
         self.in_channels = layer[1]
+        
+        return res
+        
     
     def _get_maxpool_layer(self):
         return [

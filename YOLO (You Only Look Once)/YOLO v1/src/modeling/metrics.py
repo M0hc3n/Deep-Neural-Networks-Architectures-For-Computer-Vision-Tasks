@@ -71,7 +71,7 @@ def mean_average_precision(pred, target, iou_threshold=0.5, num_classes=20):
         FP = torch.zeros((len(detections)))
         total_true_bboxes = len(ground_truths)
         
-        if len(total_true_bboxes) < 1:
+        if total_true_bboxes < 1:
             continue
         
         for detection_idx, detection in enumerate(detections):

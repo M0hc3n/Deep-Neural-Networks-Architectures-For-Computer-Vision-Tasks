@@ -1,16 +1,8 @@
-**This folder including mainly on the implementation with coding, conventions .. which related to development**
+## YOLO (You Only Look Once) v1:
 
-**What will be implement?**
-- 
-- Engineering features (Everyone)
-- Data Preparation (Data Engieer)
-- Modeling (Data Scientist)
-- Deployment (AI Engineer/DevOps)
+The following, is an implementation of the latter architecture. I am also attaching a set of usefull links:
 
-**Engineering features**: Which are features help ML project solve problems by engineering features such as: Data Processing, Resource Provisioning ...
-
-**Data Preparation**: Which inclduing function to prepare data for training model
-
-**Modeling**: Building model which prepared data
-
-**Evaluation**: 
+- [The Original Paper](https://arxiv.org/pdf/1506.02640)
+- [Kaggle Notebook (to see the results)](.)
+- [Original Implementation](https://github.com/aladdinpersson/Machine-Learning-Collection/tree/master/ML/Pytorch/object_detection/YOLO)
+- [A good video that help you understand some parts of the paper](https://www.youtube.com/watch?v=n9_XyCGr-MI&list=PLhhyoLH6Ijfw0TpCTVTNk42NN08H6UvNq&index=5)
