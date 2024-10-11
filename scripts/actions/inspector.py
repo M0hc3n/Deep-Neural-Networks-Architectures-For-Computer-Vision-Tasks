@@ -11,7 +11,9 @@ llm = HuggingFaceEndpoint(
 )
 
 # Get PR details
-pr_number = os.environ['GITHUB_EVENT_NUMBER']
+pr_number = os.environ['GITHUB_EVENT_NAME']
+
+print(pr_number)
 repo = os.environ['GITHUB_REPOSITORY']
 api_url = f'https://api.github.com/repos/{repo}/pulls/{pr_number}'
 headers = {'Authorization': f'token {os.environ["GITHUB_TOKEN"]}'}
