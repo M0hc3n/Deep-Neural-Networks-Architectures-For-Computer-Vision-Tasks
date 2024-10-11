@@ -1,6 +1,6 @@
 import os
 import requests
-from langchain import HuggingFaceEndpoint
+from langchain_huggingface import HuggingFaceEndpoint
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
