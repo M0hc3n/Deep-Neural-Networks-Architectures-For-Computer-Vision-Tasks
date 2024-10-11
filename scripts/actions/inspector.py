@@ -6,7 +6,7 @@ from langchain.prompts import PromptTemplate
 
 # Set up the LLM
 llm = HuggingFaceEndpoint(
-    reop_id='mistralai/Mistral-7B-Instruct-v0.2',
+    repo_id='mistralai/Mistral-7B-Instruct-v0.2',
     huggingfacehub_api_token=os.environ['HUGGINGFACE_API_KEY']
 )
 
