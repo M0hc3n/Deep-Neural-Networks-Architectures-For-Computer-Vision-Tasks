@@ -1,10 +1,6 @@
 import torch
 from tqdm import tqdm
 
-from core.config import device
-
-from modeling.metrics import non_max_suppression
-
 def cellboxes_to_boxes(predictions, S=7, B=2, C=20):
     """
     Convert YOLO output to bounding boxes
@@ -56,7 +52,9 @@ def get_bboxes(loader, model, iou_threshold, threshold):
             predictions = model(x)
 
         batch_size = x.shape[0]
+        
         pred_bboxes = cellboxes_to_boxes(predictions)
+        
         target_bboxes = cellboxes_to_boxes(y)
 
         for idx in range(batch_size):
@@ -65,7 +63,7 @@ def get_bboxes(loader, model, iou_threshold, threshold):
                 iou_threshold=iou_threshold,
                 prob_threshold=threshold,
             )
-
+            
             for nms_box in nms_boxes:
                 all_pred_boxes.append([batch_idx] + nms_box)
 

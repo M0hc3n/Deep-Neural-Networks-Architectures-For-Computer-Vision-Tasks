@@ -3,11 +3,6 @@ import matplotlib.pyplot as plt
 
 import matplotlib.ticker as mticker
 
-from modeling.metrics import mean_average_precision
-from preparation.utils import get_bboxes
-
-from core.config import report_dir, device
-
 from tqdm import tqdm
 
 class ModelTrainer:
@@ -16,7 +11,7 @@ class ModelTrainer:
 
     model, criterion, optimizer = None, None, None
     
-    mean_loss = []
+    epoch_loss = []
 
     epochs = 5
 
@@ -29,6 +24,8 @@ class ModelTrainer:
         self.optimizer = optimizer
 
         self.epochs = epochs
+        
+        self.epoch_loss = []
 
     def trainer_each_epoch(self):
         looper = tqdm(self.training_data_loader, leave=True)
@@ -41,7 +38,6 @@ class ModelTrainer:
             
             batch_loss.append(loss.item())
 
-
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -53,15 +49,17 @@ class ModelTrainer:
     def train_model(self):
         
         for epoch in range(self.epochs):
-            pred_boxes, target_boxes = get_bboxes(self.training_data_loader, self.model, iou_threshold=0.5, threshold=0.4)
+            pred_boxes, target_boxes = get_bboxes(self.training_data_loader, self.model, iou_threshold=0, threshold=0)
             
             mean_avg_precision = mean_average_precision(
-                pred=pred_boxes, target=target_boxes, iou_threshold=0.5
+                pred=pred_boxes, target=target_boxes, iou_threshold=0
             )
+                        
+            curr_loss = self.trainer_each_epoch()
             
-            print(f"EPOCH: {epoch}.      Mean Average Precision Value: {mean_avg_precision}")
+            print(f"EPOCH: {epoch}.      EPOCH Loss: {curr_loss}.      Mean Average Precision {mean_avg_precision}")
             
-            self.trainer_each_epoch()
+            self.epoch_loss.append(curr_loss)
 
     def plot_trainning_report(self):
                 
