@@ -46,4 +46,6 @@ comment_url = f'https://api.github.com/repos/M0hc3n/{repo}/pulls/{pr_number}/com
 comment_data = {'body': f'## PR Changes Summary\n\n{result}'}
 requests.post(comment_url, json=comment_data, headers=headers)
 
+print('Result: ', result)
+
 print('PR inspection complete. Comment posted.')
