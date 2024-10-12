@@ -11,7 +11,7 @@ llm = HuggingFaceEndpoint(
 )
 
 # Get PR details
-pr_number = os.environ['GITHUB_EVENT_NAME']
+pr_number = os.environ['PR_NUMBER']
 
 print(pr_number)
 repo = os.environ['GITHUB_REPOSITORY']
@@ -40,8 +40,9 @@ prompt = PromptTemplate(template=template, input_variables=['diff'])
 chain = LLMChain(llm=llm, prompt=prompt)
 result = chain.run(diff=diff_content)
 
+print('URL ', f'https://api.github.com/repos/M0hc3n/{repo}/pulls/{pr_number}/comments')
 # Post comment on PR
-comment_url = f'https://api.github.com/repos/{repo}/issues/{pr_number}/comments'
+comment_url = f'https://api.github.com/repos/M0hc3n/{repo}/pulls/{pr_number}/comments'
 comment_data = {'body': f'## PR Changes Summary\n\n{result}'}
 requests.post(comment_url, json=comment_data, headers=headers)
 
