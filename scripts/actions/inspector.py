@@ -11,7 +11,7 @@ llm = HuggingFaceEndpoint(
 )
 
 # Get PR details
-pr_number = os.environ['GITHUB_EVENT_NAME']
+pr_number = os.environ['PR_NUMBER']
 
 print(pr_number)
 repo = os.environ['GITHUB_REPOSITORY']
