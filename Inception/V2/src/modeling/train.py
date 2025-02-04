@@ -53,14 +53,13 @@ class ModelTrainer:
                 # generate predictions on the current set of inputs
                 # recall that we also extract the predictions from the auxialiaries
                 # and count them in the loss calculation
-                pred, aux_pred1, aux_pred2 = self.model(inputs)
+                pred, aux_pred1 = self.model(inputs)
 
                 # calculate loss
                 real_loss = self.criterion(pred, labels)
                 loss_aux1 = self.criterion(aux_pred1, labels)
-                loss_aux2 = self.criterion(aux_pred2, labels)
 
-                loss = real_loss + (0.3 * loss_aux1) + (0.3 * loss_aux2)
+                loss = real_loss + (0.6 * loss_aux1)
 
                 loss.backward()  # run backpropagation
                 self.optimizer.step()  # compute the new weights
@@ -92,14 +91,13 @@ class ModelTrainer:
                     inputs, labels = inputs.to(device), labels.to(device)
 
                     # Forward pass.
-                    prediction, prediction_aux1, prediction_aux2 = self.model(inputs)
+                    prediction, prediction_aux1 = self.model(inputs)
 
                     # Compute the loss.
                     real_loss = self.criterion(prediction, labels)
                     loss_aux1 = self.criterion(prediction_aux1, labels)
-                    loss_aux2 = self.criterion(prediction_aux2, labels)
 
-                    loss = real_loss + (0.3 * loss_aux1) + (0.3 * loss_aux2)
+                    loss = real_loss + (0.6 * loss_aux1)
 
                     # Compute validation accuracy.
                     _, predicted_outputs = torch.max(prediction.data, 1)

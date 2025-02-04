@@ -3,153 +3,156 @@ import torch.nn as nn
 from torch import optim
 
 from modeling.conv_block import ConvBlock
-from modeling.inception import Inception
+from modeling.inception.inception_a import InceptionA
+from modeling.inception.inception_b import InceptionB
+from modeling.inception.inception_c import InceptionC
+
 from modeling.auxilary import Auxiliary
 
 
-class GoogleLeNet(nn.Module):
-    def __init__(self, num_classes):
-        super(GoogleLeNet, self).__init__()
+class InceptionV2(nn.Module):
+    def __init__(
+        self,
+        num_classes=1000,
+        aux_logits=True,
+        transform_input=False,
+        init_weights=True,
+        blocks=None,
+    ):
+        super(InceptionV2, self).__init__()
 
-        self.conv1 = ConvBlock(3, 64, kernel_size=7, stride=2, padding=3)
-        self.pool1 = nn.MaxPool2d(3, stride=2, padding=0, ceil_mode=True)
-        self.conv2 = ConvBlock(64, 64, kernel_size=1, stride=1, padding=0)
-        self.conv3 = ConvBlock(64, 192, kernel_size=3, stride=1, padding=1)
-        self.pool2 = nn.MaxPool2d(3, stride=2, padding=0, ceil_mode=True)
+        self.conv1 = ConvBlock(3, 32, kernel_size=3, stride=2)
+        self.conv2 = ConvBlock(32, 32, kernel_size=3, stride=1)
+        self.conv3 = ConvBlock(32, 64, kernel_size=3, stride=1, padding=1)
+        self.maxpool = nn.MaxPool2d(3, stride=2, ceil_mode=True)
+        self.conv4 = ConvBlock(64, 80, kernel_size=3, stride=1)
+        self.conv5 = ConvBlock(80, 192, kernel_size=3, stride=2)
+        self.conv6 = ConvBlock(192, 288, kernel_size=3, stride=1, padding=1)
 
-        self.inception3A = Inception(
-            in_channels=192,
-            num1x1=64,
-            num3x3_reduce=96,
-            num3x3=128,
-            num5x5_reduce=16,
-            num5x5=32,
-            pool_proj=32,
+        self.inception3a = InceptionA(288, 64, 64, 64, 64, 96, 64, pool_type="avg")
+        self.inception3b = InceptionA(288, 64, 64, 96, 64, 96, 32, pool_type="avg")
+        self.inception3c = InceptionA(
+            288, 0, 128, 320, 64, 160, 0, pool_type="max", stride_num=2
         )
 
-        self.inception3B = Inception(
-            in_channels=256,
-            num1x1=128,
-            num3x3_reduce=128,
-            num3x3=192,
-            num5x5_reduce=32,
-            num5x5=96,
-            pool_proj=64,
+        self.inception5a = InceptionB(768, 192, 96, 160, 96, 160, 256, pool_type="avg")
+        self.inception5b = InceptionB(768, 192, 96, 160, 96, 160, 256, pool_type="avg")
+        self.inception5c = InceptionB(768, 192, 96, 160, 96, 160, 256, pool_type="avg")
+        self.inception5d = InceptionB(768, 192, 96, 160, 96, 160, 256, pool_type="avg")
+        self.inception5e = InceptionB(
+            768, 0, 128, 192, 128, 320, 0, pool_type="max", stride_num=2
         )
 
-        self.pool3 = nn.MaxPool2d(3, stride=2, padding=0, ceil_mode=True)
-
-        self.inception4A = Inception(
-            in_channels=480,
-            num1x1=192,
-            num3x3_reduce=96,
-            num3x3=208,
-            num5x5_reduce=16,
-            num5x5=48,
-            pool_proj=64,
+        self.inception2a = InceptionC(
+            1280, 256, 128, 160, 128, 240, 224, pool_type="avg"
         )
+        self.inception2b = InceptionC(1280, 256, 96, 96, 96, 160, 0, pool_type="max")
 
-        self.inception4B = Inception(
-            in_channels=512,
-            num1x1=160,
-            num3x3_reduce=112,
-            num3x3=224,
-            num5x5_reduce=24,
-            num5x5=64,
-            pool_proj=64,
-        )
+        if aux_logits:
+            self.aux = Auxiliary(768, num_classes)
 
-        self.inception4C = Inception(
-            in_channels=512,
-            num1x1=128,
-            num3x3_reduce=128,
-            num3x3=256,
-            num5x5_reduce=24,
-            num5x5=64,
-            pool_proj=64,
-        )
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(0.2)
+        self.fc1 = nn.Linear(2048, 1024)
+        self.fc2 = nn.Linear(1024, num_classes)
 
-        self.inception4D = Inception(
-            in_channels=512,
-            num1x1=112,
-            num3x3_reduce=144,
-            num3x3=288,
-            num5x5_reduce=32,
-            num5x5=64,
-            pool_proj=64,
-        )
+        if init_weights:
+            self.initialize_weights()
 
-        self.inception4E = Inception(
-            in_channels=528,
-            num1x1=256,
-            num3x3_reduce=160,
-            num3x3=320,
-            num5x5_reduce=32,
-            num5x5=128,
-            pool_proj=128,
-        )
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+                import scipy.stats as stats
 
-        self.pool4 = nn.MaxPool2d(3, stride=2, padding=0, ceil_mode=True)
+                X = stats.truncnorm(-2, 2, scale=0.01)
+                values = torch.as_tensor(X.rvs(m.weight.numel()), dtype=m.weight.dtype)
+                values = values.view(m.weight.size())
+                with torch.no_grad():
+                    m.weight.copy_(values)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
-        self.inception5A = Inception(
-            in_channels=832,
-            num1x1=256,
-            num3x3_reduce=160,
-            num3x3=320,
-            num5x5_reduce=32,
-            num5x5=128,
-            pool_proj=128,
-        )
+    def _transform_input(self, x):
+        if self.transform_input:
+            # this performs a standard normalization that adjusts the mean and std
+            # why those values in specific ? bcz those reflect the distribution of the ImageNet dataset
+            x_ch0 = torch.unsqueeze(x[:, 0], 1) * (0.229 / 0.5) + (0.485 - 0.5) / 0.5
+            x_ch1 = torch.unsqueeze(x[:, 1], 1) * (0.224 / 0.5) + (0.456 - 0.5) / 0.5
+            x_ch2 = torch.unsqueeze(x[:, 2], 1) * (0.225 / 0.5) + (0.406 - 0.5) / 0.5
 
-        self.inception5B = Inception(
-            in_channels=832,
-            num1x1=384,
-            num3x3_reduce=192,
-            num3x3=384,
-            num5x5_reduce=48,
-            num5x5=128,
-            pool_proj=128,
-        )
+            x = torch.cat((x_ch0, x_ch1, x_ch2), 1)
+        return x
 
-        self.pool5 = nn.AdaptiveAvgPool2d((1, 1))
+    def _forward(self, x):
+        # N x 3 x 299 x 299
+        x = self.conv1(x)
+        # N x 32 x 149 x 149
+        x = self.conv2(x)
+        # N x 32 x 147 x 147
+        x = self.conv3(x)
+        # N x 64 x 147 x 147
+        x = self.maxpool(x)
+        # N x 64 x 73 x 73
+        x = self.conv4(x)
+        # N x 80 x 71 x 71
+        x = self.conv5(x)
+        # N x 192 x 35 x 35
+        x = self.conv6(x)
+        # N x 288 x 35 x 35
 
-        self.dropout = nn.Dropout(0.4)
-        self.fc = nn.Linear(1024, num_classes)
+        x = self.inception3a(x)
+        # N x 288 x 35 x 35
+        x = self.inception3b(x)
+        # N x 288 x 35 x 35
+        x = self.inception3c(x)
+        # N x 768 x 17 x 17
 
-        self.aux4A = Auxiliary(512, num_classes)
-        self.aux4D = Auxiliary(528, num_classes)
+        x = self.inception5a(x)
+        # N x 768 x 17 x 17
+        x = self.inception5b(x)
+        # N x 768 x 17 x 17
+        x = self.inception5c(x)
+        # N x 768 x 17 x 17
+        x = self.inception5d(x)
+        # N x 768 x 17 x 17
+
+        aux_defined = self.training and self.aux_logits
+        if aux_defined:
+            aux = self.aux(x)
+        else:
+            aux = None
+
+        x = self.inception5e(x)
+        # N x 1280 x 8 x 8
+        x = self.inception2a(x)
+        # N x 1280 x 8 x 8
+        x = self.inception2b(x)
+        # N x 1280 x 8 x 8
+
+        x = self.avgpool(x)
+        # N x 2048 x 1 x 1
+        x = torch.flatten(x, 1)
+        # N x 2048
+        x = self.dropout(x)
+        # N x 2048
+        x = self.fc1(x)
+        # N x 1024
+        x = self.dropout(x)
+        # N x 1024
+        x = self.fc2(x)
+        # N x 1000 (num_classes)
+        return x, aux
 
     def forward(self, x):
-        out = self.conv1(x)
-        out = self.pool1(out)
-        out = self.conv2(out)
-        out = self.conv3(out)
-        out = self.pool2(out)
+        x = self._transform_input(x)
+        x, aux = self._forward(x)
+        aux_defined = self.training and self.aux_logits
 
-        out = self.inception3A(out)
-        out = self.inception3B(out)
-        out = self.pool3(out)
-        out = self.inception4A(out)
-
-        aux1 = self.aux4A(out)
-
-        out = self.inception4B(out)
-        out = self.inception4C(out)
-        out = self.inception4D(out)
-
-        aux2 = self.aux4D(out)
-
-        out = self.inception4E(out)
-        out = self.pool4(out)
-        out = self.inception5A(out)
-        out = self.inception5B(out)
-        out = self.pool5(out)
-
-        out = torch.flatten(out, 1)  # flattent to one dim tensor
-        out = self.dropout(out)
-        out = self.fc(out)
-
-        return out, aux1, aux2
+        if aux_defined:
+            return x, aux
+        else:
+            return x
 
     def get_criterion(self):
         return nn.CrossEntropyLoss()

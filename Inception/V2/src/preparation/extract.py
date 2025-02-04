@@ -2,6 +2,7 @@ from torchvision import transforms, datasets
 
 from torch.utils.data import DataLoader, random_split
 
+
 class GetDataset:
     input_dir = ""
 
@@ -10,10 +11,10 @@ class GetDataset:
             [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
         )
 
-        train_valid_data = datasets.CIFAR10(
+        train_valid_data = datasets.ImageNet(
             f"{input_dir}/train", train=True, download=True, transform=transform
         )
-        test_dataset = datasets.CIFAR10(
+        test_dataset = datasets.ImageNet(
             f"{input_dir}/test", train=False, download=True, transform=transform
         )
 
@@ -39,5 +40,5 @@ class GetDataset:
             valid_dataset, batch_size=batch_size, shuffle=True
         )
         self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-        
+
         self.num_classes = len(train_valid_data.classes)
