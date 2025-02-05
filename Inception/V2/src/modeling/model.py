@@ -3,9 +3,9 @@ import torch.nn as nn
 from torch import optim
 
 from modeling.conv_block import ConvBlock
-from modeling.inception.inception_a import InceptionA
-from modeling.inception.inception_b import InceptionB
-from modeling.inception.inception_c import InceptionC
+from modeling.inception_a import InceptionA
+from modeling.inception_b import InceptionB
+from modeling.inception_c import InceptionC
 
 from modeling.auxilary import Auxiliary
 

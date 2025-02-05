@@ -5,7 +5,10 @@ from core.config import device
 
 from modeling.train import ModelTrainer
 
-data = GetDataset(input_dir="./data/raw", batch_size=32)
+data = GetDataset(
+    input_dir="data/raw",
+    batch_size=32,
+)
 
 # model = InceptionV2(num_classes=data.num_classes).to(device)
 

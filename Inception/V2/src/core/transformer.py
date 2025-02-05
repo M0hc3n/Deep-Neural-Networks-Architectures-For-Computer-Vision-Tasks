@@ -44,7 +44,7 @@ def convert_to_notebook(project_dir, main_file, folder_order, last_files=None):
 
         add_code_cell(main_code)
 
-    with open("./src/googlelenet.ipynb", "w") as f:
+    with open("./src/inception_v2.ipynb", "w") as f:
         nbf.write(nb, f)
 
 

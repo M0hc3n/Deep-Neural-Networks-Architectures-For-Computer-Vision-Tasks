@@ -12,10 +12,11 @@ class GetDataset:
         )
 
         train_valid_data = datasets.ImageNet(
-            f"{input_dir}/train", train=True, download=True, transform=transform
+            f"{input_dir}/train", train=True, transform=transform
         )
+
         test_dataset = datasets.ImageNet(
-            f"{input_dir}/test", train=False, download=True, transform=transform
+            f"{input_dir}/test", train=False, transform=transform
         )
 
         train_dataset, valid_dataset = random_split(train_valid_data, (45000, 5000))
